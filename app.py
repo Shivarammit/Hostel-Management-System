@@ -1,157 +1,194 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
+from typing import Optional
 import sqlite3
-from typing import List, Optional
 
 app = FastAPI()
-DATABASE = "hostel.db"
+DATABASE = "hms.db"
 
 def get_db():
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(DATABASE, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     try:
         yield conn
     finally:
         conn.close()
 
-# Models
+# Data Models
 class FeeCollectionRequest(BaseModel):
-    semester: str
+    semester: int
+    amount: float
 
 class RoomAllocationRequest(BaseModel):
-    alumni_id: int
+    student_id: int
     room_id: int
 
 class AttendanceUpdate(BaseModel):
-    alumni_id: int
-    attendance_date: str
-    status: str
-
-class GatepassRequest(BaseModel):
-    alumni_id: int
-    out_date: str
-    in_date: str
+    stu_id: int
+    attendance: str
+    date: str
 
 class GatepassApproval(BaseModel):
-    request_id: int
+    approval_id: int
     approved: bool
 
+class ParentLogin(BaseModel):
+    username: str
+    password: str
+
+class StudentLogin(BaseModel):
+    username: str
+    password: str
+
 class PaymentRequest(BaseModel):
-    alumni_id: int
+    student_id: int
     amount: float
 
-# Admin APIs
-@app.post("/admin/trigger_fee_collection")
-def trigger_fee_collection(semester: FeeCollectionRequest):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    # Insert payment record for all students with status 'pending'
-    c.execute("SELECT alumni_id FROM student")
-    students = c.fetchall()
-    for s in students:
-        c.execute(
-            "INSERT INTO student_transaction (alumni_id, payment_date, amount, status) VALUES (?, ?, ?, ?)",
-            (s['alumni_id'], None, 0.0, 'pending')  # amount and date can be updated later
-        )
-    conn.commit()
-    conn.close()
-    return {"msg": f"Fee collection cycle {semester.semester} triggered"}
 
+# FR-1: Trigger Fee Collection
+@app.post("/admin/trigger_fee_collection")
+def trigger_fee_collection(req: FeeCollectionRequest, db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("SELECT id FROM Student WHERE semester=?", (req.semester,))
+    students = c.fetchall()
+    for row in students:
+        c.execute("INSERT INTO Fee (student_id, amount, status) VALUES (?, ?, ?)", (row['id'], req.amount, 'pending'))
+    db.commit()
+    return {"msg": f"Fee collection triggered for semester {req.semester}"}
+
+# FR-2: Manage Rooms Allocation
 @app.post("/admin/allocate_room")
-def allocate_room(request: RoomAllocationRequest):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    # Check if room is available
-    c.execute("SELECT * FROM rooms WHERE room_id=? AND is_allocated=0", (request.room_id,))
+def allocate_room(req: RoomAllocationRequest, db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("SELECT status FROM Rooms WHERE id=?", (req.room_id,))
     room = c.fetchone()
-    if not room:
+    if not room or room['status'] == 'allocated':
         raise HTTPException(status_code=400, detail="Room not available")
-    # Allocate room
-    c.execute("INSERT INTO student_allocation (alumni_id, room_id) VALUES (?, ?)", (request.alumni_id, request.room_id))
-    c.execute("UPDATE rooms SET is_allocated=1 WHERE room_id=?", (request.room_id,))
-    conn.commit()
-    conn.close()
+    c.execute("UPDATE Student SET room_id=? WHERE id=?", (req.room_id, req.student_id))
+    c.execute("UPDATE Rooms SET status='allocated' WHERE id=?", (req.room_id,))
+    db.commit()
     return {"msg": "Room allocated"}
 
-# Residential Counselor APIs
+# FR-2: Manage Rooms Release
+@app.post("/admin/release_room")
+def release_room(student_id: int, db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("SELECT room_id FROM Student WHERE id=?", (student_id,))
+    row = c.fetchone()
+    if not row or not row['room_id']:
+        raise HTTPException(status_code=404, detail="Student or room not found")
+    c.execute("UPDATE Rooms SET status='available' WHERE id=?", (row['room_id'],))
+    c.execute("UPDATE Student SET room_id=NULL WHERE id=?", (student_id,))
+    db.commit()
+    return {"msg": "Room released"}
+
+# FR-3: Generate Hostel Reports (summary example)
+@app.get("/admin/reports/fee_payment")
+def generate_fee_report(db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("""
+        SELECT s.id, s.username, f.amount, f.status FROM Student s
+        LEFT JOIN Fee f ON s.id = f.student_id
+    """)
+    rows = c.fetchall()
+    return {"fee_report": [dict(r) for r in rows]}
+
+@app.get("/admin/reports/attendance")
+def generate_attendance_report(db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("""
+        SELECT s.id, s.username, a.attendance, a.date FROM Student s
+        LEFT JOIN Attendance a ON s.id = a.stu_id
+    """)
+    rows = c.fetchall()
+    return {"attendance_report": [dict(r) for r in rows]}
+
+# FR-4: Update Attendance
 @app.post("/rc/update_attendance")
-def update_attendance(attendance: AttendanceUpdate):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute(
-        "INSERT INTO attendance (alumni_id, attendance_date, status) VALUES (?, ?, ?)",
-        (attendance.alumni_id, attendance.attendance_date, attendance.status)
-    )
-    conn.commit()
-    conn.close()
+def update_attendance(attendance: AttendanceUpdate, db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("INSERT INTO Attendance (stu_id, attendance, date) VALUES (?, ?, ?)",
+              (attendance.stu_id, attendance.attendance, attendance.date))
+    db.commit()
     return {"msg": "Attendance updated"}
 
-@app.get("/rc/verify_gatepass/{request_id}")
-def verify_gatepass(request_id: int):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("SELECT approved_by_parent FROM gatepass_request WHERE request_id=?", (request_id,))
-    row = c.fetchone()
-    if row and row[0] == 1:
-        return {"allowed": True}
-    else:
-        return {"allowed": False}
+# FR-5: Gatepass Verification (RC checks approval)
+@app.get("/rc/verify_gatepass/{approval_id}")
+def verify_gatepass(approval_id: int, db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("SELECT status, parent_ack FROM Approval WHERE id=?", (approval_id,))
+    approval = c.fetchone()
+    if not approval:
+        raise HTTPException(status_code=404, detail="Gatepass request not found")
+    allowed = approval['status'] == 'approved' and approval['parent_ack'] == 'approved'
+    return {"allowed": allowed, "status": approval['status'], "parent_ack": approval['parent_ack']}
 
-# Parent APIs
-@app.get("/parent/gatepass_requests/{parent_id}")
-def get_gatepass_requests(parent_id: int):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("""
-        SELECT g.request_id, g.out_date, g.in_date, g.status FROM gatepass_request g
-        JOIN student s ON g.alumni_id = s.alumni_id
-        WHERE s.parent_id = ?
-    """, (parent_id,))
-    rows = c.fetchall()
-    return [dict(row) for row in rows]
+# FR-6: View Records (RC views fee and attendance)
+@app.get("/rc/view_records/{student_id}")
+def rc_view_records(student_id: int, db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("SELECT * FROM Fee WHERE student_id=?", (student_id,))
+    fees = [dict(row) for row in c.fetchall()]
+    c.execute("SELECT * FROM Attendance WHERE stu_id=?", (student_id,))
+    attendance = [dict(row) for row in c.fetchall()]
+    return {"fee_records": fees, "attendance_records": attendance}
 
+# FR-7: Parent Login
+@app.post("/parent/login")
+def parent_login(login: ParentLogin, db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("SELECT * FROM Parent WHERE username=? AND password=?", (login.username, login.password))
+    user = c.fetchone()
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return {"msg": "Login successful", "parent_id": user['id']}
+
+# FR-8: Approve/Reject Gatepass
 @app.post("/parent/approve_gatepass")
-def approve_gatepass(approval: GatepassApproval):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
+def approve_gatepass(approval: GatepassApproval, db=Depends(get_db)):
     status = 'approved' if approval.approved else 'rejected'
-    c.execute("UPDATE gatepass_request SET status=?, approved_by_parent=? WHERE request_id=?",
-              (status, 1 if approval.approved else 0, approval.request_id))
-    conn.commit()
-    conn.close()
+    c = db.cursor()
+    c.execute("UPDATE Approval SET status=?, parent_ack=? WHERE id=?", (status, status, approval.approval_id))
+    db.commit()
     return {"msg": f"Gatepass {status}"}
 
-# Student APIs
+# FR-9: Parent Views Student Records (fee and attendance)
+@app.get("/parent/student_records/{student_id}")
+def parent_view_student_records(student_id: int, db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("SELECT * FROM Fee WHERE student_id=?", (student_id,))
+    fees = [dict(row) for row in c.fetchall()]
+    c.execute("SELECT * FROM Attendance WHERE stu_id=?", (student_id,))
+    attendance = [dict(row) for row in c.fetchall()]
+    return {"fee_records": fees, "attendance_records": attendance}
+
+# FR-10: Student Login
+@app.post("/student/login")
+def student_login(login: StudentLogin, db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("SELECT * FROM Student WHERE username=? AND password=?", (login.username, login.password))
+    user = c.fetchone()
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return {"msg": "Login successful", "student_id": user['id']}
+
+# FR-11: Pay Fees
 @app.post("/student/pay_fee")
-def pay_fee(payment: PaymentRequest):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("UPDATE student_transaction SET status='paid', payment_date=date('now'), amount=? WHERE alumni_id=? AND status='pending'",
-              (payment.amount, payment.alumni_id))
-    conn.commit()
-    conn.close()
+def pay_fee(payment: PaymentRequest, db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("UPDATE Fee SET status='paid', amount=? WHERE student_id=? AND status='pending'",
+              (payment.amount, payment.student_id))
+    if c.rowcount == 0:
+        raise HTTPException(status_code=400, detail="No pending fee found")
+    db.commit()
     return {"msg": "Payment successful"}
 
-@app.post("/student/apply_gatepass")
-def apply_gatepass(gatepass: GatepassRequest):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("INSERT INTO gatepass_request (alumni_id, out_date, in_date) VALUES (?, ?, ?)",
-              (gatepass.alumni_id, gatepass.out_date, gatepass.in_date))
-    conn.commit()
-    conn.close()
-    return {"msg": "Gatepass applied"}
-
-@app.get("/student/room_allocation/{alumni_id}")
-def get_room_allocation(alumni_id: int):
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("""
-        SELECT r.room_number FROM student_allocation sa
-        JOIN rooms r ON sa.room_id = r.room_id
-        WHERE sa.alumni_id = ?
-    """, (alumni_id,))
-    row = c.fetchone()
-    if not row:
-        raise HTTPException(status_code=404, detail="Room not allocated")
-    return {"room_number": row[0]}
+# FR-12: Download Receipt (latest paid fee)
+@app.get("/student/fee_receipt/{student_id}")
+def download_receipt(student_id: int, db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("SELECT * FROM Fee WHERE student_id=? AND status='paid' ORDER BY id DESC LIMIT 1", (student_id,))
+    receipt = c.fetchone()
+    if not receipt:
+        raise HTTPException(status_code=404, detail="No paid fee found")
+    return {"receipt": dict(receipt)}
