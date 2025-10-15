@@ -1,0 +1,105 @@
+:root{
+--primary:#0d6efd;
+--muted:#6c757d;
+--card-bg:#ffffff;
+--accent:#6f42c1;
+}
+
+
+body{ background: linear-gradient(180deg,#f7f8fc 0%, #fff 100%); color:#222; }
+
+
+.app-root main.container{ max-width:1100px; }
+
+
+/* pro-card styling */
+.pro-card{ border-radius:12px; overflow:hidden; transition:transform .18s ease, box-shadow .18s ease; }
+.pro-card:hover{ transform:translateY(-6px); box-shadow:0 12px 30px rgba(16,24,40,0.08); }
+.pro-card .card-body{ padding:1.25rem 1.5rem; }
+.pro-card .card-title{ color:var(--primary); }
+
+
+/* auth page */
+.auth-page{ margin-top:3.5rem; }
+
+
+/* navbar custom */
+.navbar-brand{ letter-spacing:0.6px; }
+.navbar .dropdown-menu{ min-width:220px; }
+
+
+/* list group items */
+.list-group-item{ border-radius:8px; margin-bottom:0.6rem; }
+
+
+/* responsive tweaks */
+@media (max-width:768px){
+.pro-card .card-body{ padding:1rem; }
+}
+
+
+/* subtle utility */
+.btn-outline-primary{ border-radius:8px; }
+.card{ border-radius:12px; }
+
+
+/* form controls */
+.form-control, .form-select { border-radius:10px; }
+
+
+/* small visual flourish for headings */
+h4{ color:var(--accent); }
+
+
+/* footer small text */
+.card-footer{ background:transparent; border-top:0; }
+
+
+/* accessibility focus */
+.btn:focus, .form-control:focus{ box-shadow:0 0 0 .18rem rgba(13,110,253,.12); }
+
+
+/* make tables/cards look modern */
+.card .small.text-muted{ opacity:0.85 }
+
+/* pro.css additions */
+.gallery-card img {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.gallery-card img:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Custom Navbar Color */
+.custom-navbar {
+  background-color: #6f42c1; /* deep purple */
+}
+
+.custom-navbar .nav-link {
+  color: #fff; /* link color */
+  transition: color 0.2s ease;
+}
+
+.custom-navbar .nav-link:hover {
+  color: #ffc107; /* hover color (yellow) */
+}
+
+.custom-navbar .navbar-brand {
+  color: #fff;
+}
+
+.custom-navbar .navbar-brand:hover {
+  color: #ffc107;
+}
+
+.custom-navbar .btn-outline-light {
+  border-color: #fff;
+  color: #fff;
+}
+
+.custom-navbar .btn-outline-light:hover {
+  background-color: #fff;
+  color: #6f42c1;
+}
+
