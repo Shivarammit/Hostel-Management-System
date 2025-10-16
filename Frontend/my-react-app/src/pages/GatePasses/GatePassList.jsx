@@ -2,64 +2,106 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../../api/mockApi';
 import { useAuth } from '../../contexts/AuthContext';
 
+export default function GatePassList() {
+  const { user } = useAuth();
+  const [gatePasses, setGatePasses] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-export default function GatePassList(){
-const { user } = useAuth();
-const [list,setList] = useState([]);
+  const fetchData = async () => {
+    setLoading(true);
+    const res = await api.fetchGatePasses();
+    let filtered = [];
 
+    if (user.role === 'Parent') {
+      filtered = res.filter(gp => gp.status === 'PendingParent');
+    } else if (user.role === 'RC') {
+      filtered = res.filter(gp => gp.status === 'PendingRC');
+    } else {
+      filtered = res;
+    }
 
-async function load(){
-const l = await api.fetchGatePasses();
-setList(l);
-}
-useEffect(()=>{ load(); },[]);
+    setGatePasses(filtered);
+    setLoading(false);
+  };
 
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-const onParentAction = async (id,approve) =>{
-// Parent approves moves to RC approval
-await api.updateGatePass(id,{ status: approve ? 'PendingRC' : 'RejectedByParent' });
-load();
-};
-const onRCAction = async (id,approve) =>{
-await api.updateGatePass(id,{ status: approve ? 'Approved' : 'RejectedByRC' });
-load();
-};
+  const handleApprove = async (id) => {
+    if (user.role === 'Parent') {
+      await api.updateGatePass(id, { parentApproved: true });
+    } else if (user.role === 'RC') {
+      await api.updateGatePass(id, { rcApproved: true });
+    }
+    fetchData();
+  };
 
+  const handleReject = async (id) => {
+    await api.updateGatePass(id, { status: 'Rejected' });
+    fetchData();
+  };
 
-return (
-<div>
-<h4>Gate Pass Queue</h4>
-<div className="list-group">
-{list.length===0 && <div className="text-muted">No gate pass requests</div>}
-{list.map(gp=> (
-<div className="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-start" key={gp.id}>
-<div>
-<h6 className="mb-1">{gp.studentName}</h6>
-<small className="text-muted">{new Date(gp.createdAt).toLocaleString()}</small>
-<p className="mb-1">{gp.reason}</p>
-<div><strong>Status:</strong> {gp.status}</div>
-</div>
-<div className="mt-2 mt-md-0">
-{/* Buttons depend on role */}
-{user.role === 'Parent' && gp.status === 'PendingParent' && (
-<>
-<button onClick={()=>onParentAction(gp.id,true)} className="btn btn-sm btn-success me-1">Approve</button>
-<button onClick={()=>onParentAction(gp.id,false)} className="btn btn-sm btn-danger">Reject</button>
-</>
-)}
-{user.role === 'RC' && gp.status === 'PendingRC' && (
-<>
-<button onClick={()=>onRCAction(gp.id,true)} className="btn btn-sm btn-success me-1">Approve</button>
-<button onClick={()=>onRCAction(gp.id,false)} className="btn btn-sm btn-danger">Reject</button>
-</>
-)}
-{user.role === 'Admin' && (
-<small className="d-block text-muted">Admin can view</small>
-)}
-</div>
-</div>
-))}
-</div>
-</div>
-);
+  if (loading) return <div className="text-center mt-5">Loading...</div>;
+
+  return (
+    <div className="container mt-4">
+      <h3 className="text-center mb-3">
+        {user.role === 'Parent' ? 'Parent Gate Pass Approvals' :
+         user.role === 'RC' ? 'RC Gate Pass Approvals' : 'All Gate Passes'}
+      </h3>
+
+      <div className="table-responsive">
+        <table className="table table-bordered table-hover text-center">
+          <thead className="table-primary">
+            <tr>
+              <th>Student</th>
+              <th>Reason</th>
+              <th>From</th>
+              <th>To</th>
+              <th>Parent</th>
+              <th>RC</th>
+              <th>Status</th>
+              {(user.role === 'Parent' || user.role === 'RC') && <th>Actions</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {gatePasses.length === 0 ? (
+              <tr>
+                <td colSpan="8">No gate passes available</td>
+              </tr>
+            ) : (
+              gatePasses.map((gp) => (
+                <tr key={gp.id}>
+                  <td>{gp.studentName}</td>
+                  <td>{gp.reason}</td>
+                  <td>{gp.fromDate}</td>
+                  <td>{gp.toDate}</td>
+                  <td>{gp.parentApproved ? '✅' : '⏳'}</td>
+                  <td>{gp.rcApproved ? '✅' : gp.status === 'Rejected' ? '❌' : '⏳'}</td>
+                  <td><strong>{gp.status}</strong></td>
+                  {(user.role === 'Parent' || user.role === 'RC') && (
+                    <td>
+                      <button
+                        onClick={() => handleApprove(gp.id)}
+                        className="btn btn-success btn-sm me-2"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleReject(gp.id)}
+                        className="btn btn-danger btn-sm"
+                      >
+                        Reject
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }

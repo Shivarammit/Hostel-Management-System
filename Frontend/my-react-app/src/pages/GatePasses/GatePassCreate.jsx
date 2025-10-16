@@ -1,52 +1,128 @@
-import React, { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import React, { useState, useEffect } from 'react';
 import { api } from '../../api/mockApi';
+import { useAuth } from '../../contexts/AuthContext';
 
+export default function GatePassCreate() {
+  const { user } = useAuth();
+  const [reason, setReason] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [gatePasses, setGatePasses] = useState([]);
 
-export default function GatePassCreate(){
-const { user } = useAuth();
-const [form, setForm] = useState({ reason:'', outDate:'', returnDate:'' });
-const [status, setStatus] = useState(null);
+  const fetchGatePasses = async () => {
+    const res = await api.fetchGatePasses();
+    const myPasses = res.filter(g => g.studentId === user.id);
+    setGatePasses(myPasses);
+  };
 
+  useEffect(() => {
+    fetchGatePasses();
+  }, []);
 
-const submit = async (e) =>{
-e.preventDefault();
-try{
-const gp = await api.createGatePass({ studentId: user.id, studentName: user.name, ...form });
-setStatus('Created — pending parent approval');
-}catch(e){ setStatus('Error: '+e.message); }
-};
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!reason || !fromDate || !toDate) {
+      alert('Please fill all fields');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.createGatePass({
+        studentId: user.id,
+        studentName: user.name,
+        reason,
+        fromDate,
+        toDate,
+      });
+      alert('Gate pass created successfully');
+      setReason('');
+      setFromDate('');
+      setToDate('');
+      fetchGatePasses();
+    } catch (err) {
+      alert(err.message);
+    }
+    setSubmitting(false);
+  };
 
+  return (
+    <div className="container mt-4">
+      <h3 className="mb-3 text-center">Create Gate Pass</h3>
+      <form onSubmit={handleSubmit} className="card p-4 shadow-sm">
+        <div className="mb-3">
+          <label className="form-label">Reason</label>
+          <input
+            type="text"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            className="form-control"
+            placeholder="Enter reason for gate pass"
+          />
+        </div>
 
-return (
-<div className="row justify-content-center">
-<div className="col-lg-8">
-<div className="card shadow-sm">
-<div className="card-body">
-<h4>Create Gate Pass</h4>
-<form onSubmit={submit}>
-<div className="mb-3">
-<label className="form-label">Reason</label>
-<textarea className="form-control" value={form.reason} onChange={e=>setForm({...form,reason:e.target.value})} required />
-</div>
-<div className="row g-2">
-<div className="col-md-6 mb-3">
-<label className="form-label">Out Date</label>
-<input type="date" className="form-control" value={form.outDate} onChange={e=>setForm({...form,outDate:e.target.value})} required />
-</div>
-<div className="col-md-6 mb-3">
-<label className="form-label">Return Date</label>
-<input type="date" className="form-control" value={form.returnDate} onChange={e=>setForm({...form,returnDate:e.target.value})} required />
-</div>
-</div>
-<div className="d-flex justify-content-end">
-<button className="btn btn-primary">Submit</button>
-</div>
-{status && <div className="mt-3 alert alert-info">{status}</div>}
-</form>
-</div>
-</div>
-</div>
-</div>
-);
+        <div className="mb-3">
+          <label className="form-label">From Date</label>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="form-control"
+          />
+        </div>
+
+        <div className="mb-3">
+          <label className="form-label">To Date</label>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="form-control"
+          />
+        </div>
+
+        <button
+          type="submit"
+          className="btn btn-primary w-100"
+          disabled={submitting}
+        >
+          {submitting ? 'Creating...' : 'Create Gate Pass'}
+        </button>
+      </form>
+
+      <h4 className="mt-5 mb-3 text-center">My Gate Pass Requests</h4>
+      <div className="table-responsive">
+        <table className="table table-bordered table-hover text-center">
+          <thead className="table-primary">
+            <tr>
+              <th>Reason</th>
+              <th>From</th>
+              <th>To</th>
+              <th>Parent</th>
+              <th>RC</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {gatePasses.length === 0 ? (
+              <tr>
+                <td colSpan="6">No gate pass requests yet</td>
+              </tr>
+            ) : (
+              gatePasses.map((gp) => (
+                <tr key={gp.id}>
+                  <td>{gp.reason}</td>
+                  <td>{gp.fromDate}</td>
+                  <td>{gp.toDate}</td>
+                  <td>{gp.parentApproved ? '✅ Approved' : gp.status === 'Rejected' ? '❌ Rejected' : '⏳ Pending'}</td>
+                  <td>{gp.rcApproved ? '✅ Approved' : gp.status === 'Rejected' ? '❌ Rejected' : gp.status === 'PendingRC' ? '⏳ Pending' : '-'}</td>
+                  <td><strong>{gp.status}</strong></td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }

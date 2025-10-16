@@ -13,6 +13,8 @@ import GatePassList from "./pages/GatePasses/GatePassList";
 import GatePassCreate from "./pages/GatePasses/GatePassCreate";
 
 import Attendance from "./pages/Attendance/Attendance";
+import RCAttendance from "./pages/Attendance/RCAttendance";
+
 import Fees from "./pages/Fees/Fees";
 import Rooms from "./pages/Rooms/Rooms";
 import Reports from "./pages/Reports/Reports";
@@ -68,6 +70,15 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route
+  path="/rc/attendance"
+  element={
+    <ProtectedRoute roles={["RC"]}>
+      <RCAttendance />
+    </ProtectedRoute>
+  }
+/>
 
           {/* ----------- PARENT ----------- */}
           <Route
