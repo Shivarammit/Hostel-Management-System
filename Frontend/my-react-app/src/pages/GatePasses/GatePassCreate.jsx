@@ -115,7 +115,7 @@ export default function GatePassCreate() {
                   <td>{gp.fromDate}</td>
                   <td>{gp.toDate}</td>
                   <td>{gp.parentApproved ? '✅ Approved' : gp.status === 'Rejected' ? '❌ Rejected' : '⏳ Pending'}</td>
-                  <td>{gp.rcApproved ? '✅ Approved' : gp.status === 'Rejected' ? '❌ Rejected' : gp.status === 'PendingRC' ? '⏳ Pending' : '-'}</td>
+                  <td>{gp.rcApproved ? '✅ Approved' : gp.status === 'Rejected' ? '❌ Rejected' : gp.status === 'Pending-RC' ? '⏳ Pending' : '-'}</td>
                   <td><strong>{gp.status}</strong></td>
                 </tr>
               ))
