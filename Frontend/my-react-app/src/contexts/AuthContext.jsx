@@ -23,10 +23,12 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user]);
 
-  const login = async (username, password) => {
+  // Accepts username, password, and role to call corresponding endpoint
+  const login = async (username, password, role) => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/"+determineEndpoint(username), {
+      const endpoint = getEndpointForRole(role);
+      const res = await fetch(`http://localhost:8000/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
@@ -35,7 +37,6 @@ export const AuthProvider = ({ children }) => {
       if (!res.ok) {
         throw new Error(data.detail || "Login failed");
       }
-      // Backend should return user object with role
       setUser(data.user);
       return data.user;
     } finally {
@@ -43,11 +44,21 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Helper to decide endpoint (adjust as per your logic or inputs)
-  const determineEndpoint = (usernameOrRole) => {
-    // You can implement logic here or refactor to pass role from login component
-    // For simplicity, return "student/login" or adapt as needed
-    return "student/login";
+
+  // Maps UI role to backend route
+  const getEndpointForRole = (role) => {
+    switch (role) {
+      case "student":
+        return "student/login";
+      case "parent":
+        return "parent/login";
+      case "rc":
+        return "rc/login";
+      case "admin":
+        return "admin/login";
+      default:
+        return "student/login";
+    }
   };
 
   const logout = () => {

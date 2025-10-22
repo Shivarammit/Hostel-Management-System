@@ -142,8 +142,14 @@ def rc_login(login: RCLogin, db=Depends(get_db)):
     user = c.fetchone()
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    # Return user details as needed
-    return {"msg": "Login successful", "rc_id": user['id'], "name": user['name'], "role": "RC"}
+    user_data = {
+        "id": user["id"],
+        "username": user["username"],
+        "name": user.get("name", ""),
+        "role": "rc"
+    }
+    return {"msg": "Login successful", "user": user_data}
+
 
 @app.post("/admin/login")
 def admin_login(login: AdminLogin, db=Depends(get_db)):
@@ -152,9 +158,13 @@ def admin_login(login: AdminLogin, db=Depends(get_db)):
     user = c.fetchone()
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    # Return user details as needed
-    return {"msg": "Login successful", "admin_id": user['id'], "name": user['name'], "role": user.get('role', 'Admin')}
-
+    user_data = {
+        "id": user["id"],
+        "username": user["username"],
+        "name": user.get("name", ""),
+        "role": "admin"
+    }
+    return {"msg": "Login successful", "user": user_data}
 # Gatepass verification API
 @app.get("/rc/verify_gatepass/{approval_id}")
 def verify_gatepass(approval_id: int, db=Depends(get_db)):
@@ -183,8 +193,13 @@ def parent_login(login: ParentLogin, db=Depends(get_db)):
     user = c.fetchone()
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    return {"msg": "Login successful", "parent_id": user['id']}
-
+    user_data = {
+        "id": user["id"],
+        "username": user["username"],
+        "name": user.get("name", ""),
+        "role": "parent"
+    }
+    return {"msg": "Login successful", "user": user_data}
 # Approve/reject gatepass by parent
 @app.post("/parent/approve_gatepass")
 def approve_gatepass(approval: GatepassApproval, db=Depends(get_db)):
