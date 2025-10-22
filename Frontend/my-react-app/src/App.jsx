@@ -35,8 +35,7 @@ function App() {
   const location = useLocation();
 
   // Hide navbar & footer only on login/register pages
-  const hideNavAndFooter =
-    location.pathname === "/login" || location.pathname === "/register";
+  const hideNavAndFooter = location.pathname === "/login" || location.pathname === "/register";
 
   return (
     <div className="app-root bg-light min-vh-100 d-flex flex-column">
@@ -55,7 +54,7 @@ function App() {
 
           {/* ----------- STUDENT ----------- */}
           <Route
-            path="/student"
+            path="/studentdashboard"
             element={
               <ProtectedRoute roles={["Student"]}>
                 <StudentDashboard />
@@ -70,19 +69,18 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
-  path="/rc/attendance"
-  element={
-    <ProtectedRoute roles={["RC"]}>
-      <RCAttendance />
-    </ProtectedRoute>
-  }
-/>
+            path="/student/attendance"
+            element={
+              <ProtectedRoute roles={["Student"]}>
+                <Attendance />
+              </ProtectedRoute>
+            }
+          />
 
           {/* ----------- PARENT ----------- */}
           <Route
-            path="/parent"
+            path="/parentdashboard"
             element={
               <ProtectedRoute roles={["Parent"]}>
                 <ParentDashboard />
@@ -92,7 +90,7 @@ function App() {
 
           {/* ----------- RESIDENTIAL COUNSELLOR (RC) ----------- */}
           <Route
-            path="/rc"
+            path="/rcDashboard"
             element={
               <ProtectedRoute roles={["RC"]}>
                 <RCDashboard />
@@ -103,14 +101,14 @@ function App() {
             path="/rc/attendance"
             element={
               <ProtectedRoute roles={["RC"]}>
-                <Attendance />
+                <RCAttendance />
               </ProtectedRoute>
             }
           />
 
           {/* ----------- ADMIN ----------- */}
           <Route
-            path="/admin"
+            path="/admindashboard"
             element={
               <ProtectedRoute roles={["Admin"]}>
                 <AdminDashboard />

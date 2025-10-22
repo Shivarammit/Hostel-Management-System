@@ -1,10 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { api } from "../api/mockApi"; // adjust path if needed
 
-// ✅ Create the AuthContext
 const AuthContext = createContext(null);
 
-// ✅ AuthProvider component
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     try {
@@ -18,7 +15,6 @@ export const AuthProvider = ({ children }) => {
 
   const [loading, setLoading] = useState(false);
 
-  // Sync user to localStorage
   useEffect(() => {
     if (user) {
       localStorage.setItem("hms_user", JSON.stringify(user));
@@ -27,50 +23,44 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user]);
 
-  // Login method
-  const login = async (email, password) => {
+  const login = async (username, password) => {
     setLoading(true);
     try {
-      const res = await api.login(email, password);
-      setUser(res.user);
-      return res.user;
-    } catch (err) {
-      console.error("Login failed:", err);
-      throw err;
+      const res = await fetch("http://localhost:8000/"+determineEndpoint(username), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "Login failed");
+      }
+      // Backend should return user object with role
+      setUser(data.user);
+      return data.user;
     } finally {
       setLoading(false);
     }
   };
 
-  // Register method
-  const register = async (payload) => {
-    setLoading(true);
-    try {
-      const res = await api.register(payload);
-      setUser(res.user);
-      return res.user;
-    } catch (err) {
-      console.error("Registration failed:", err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
+  // Helper to decide endpoint (adjust as per your logic or inputs)
+  const determineEndpoint = (usernameOrRole) => {
+    // You can implement logic here or refactor to pass role from login component
+    // For simplicity, return "student/login" or adapt as needed
+    return "student/login";
   };
 
-  // Logout
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("hms_user");
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, register }}>
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-// ✅ Safe useAuth hook
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {

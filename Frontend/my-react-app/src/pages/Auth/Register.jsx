@@ -1,22 +1,61 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
 
 export default function Register() {
-  const [payload, setPayload] = useState({ name: '', email: '', password: '', role: 'Student' });
+  const [payload, setPayload] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'Student',
+  });
   const [error, setError] = useState(null);
-  const { register } = useAuth();
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Map role to registration API endpoint
+  const getRegisterUrl = (role) => {
+    switch (role.toLowerCase()) {
+      case 'student':
+        return 'http://localhost:8000/student/register';
+      case 'parent':
+        return 'http://localhost:8000/parent/register';
+      case 'rc':
+        return 'http://localhost:8000/rc/register';
+      case 'admin':
+        return 'http://localhost:8000/admin/register';
+      default:
+        return 'http://localhost:8000/student/register';
+    }
+  };
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setLoading(true);
+
     try {
-      const u = await register(payload);
-      navigate(`/${u.role.toLowerCase()}`);
+      const res = await fetch(getRegisterUrl(payload.role), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: payload.name,
+          username: payload.email, // use `username` if backend expects this key instead of email
+          password: payload.password,
+          role: payload.role,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.detail || 'Registration failed.');
+      } else {
+        // After successful registration, navigate user to their role dashboard or login
+        navigate(`/${payload.role.toLowerCase()}`);
+      }
     } catch (err) {
-      setError(err.message);
+      setError('Network error, please try again.');
     }
+    setLoading(false);
   };
 
   const styles = {
@@ -26,7 +65,7 @@ export default function Register() {
       justifyContent: 'center',
       alignItems: 'center',
       background: 'linear-gradient(135deg, #f0f4ff, #ffffff)',
-      padding: '1rem'
+      padding: '1rem',
     },
     card: {
       width: '100%',
@@ -34,11 +73,11 @@ export default function Register() {
       borderRadius: '1rem',
       boxShadow: '0 15px 35px rgba(0,0,0,0.15)',
       overflow: 'hidden',
-      transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+      transition: 'transform 0.3s ease, box-shadow 0.3s ease',
     },
     cardHover: {
       transform: 'translateY(-5px)',
-      boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
+      boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
     },
     header: {
       background: 'linear-gradient(90deg, #007bff, #6610f2)',
@@ -46,7 +85,7 @@ export default function Register() {
       textAlign: 'center',
       padding: '1rem',
       fontSize: '1.5rem',
-      fontWeight: '700'
+      fontWeight: '700',
     },
     formGroup: { marginBottom: '1rem' },
     input: {
@@ -55,16 +94,19 @@ export default function Register() {
       borderRadius: '0.5rem',
       border: '1px solid #ced4da',
       outline: 'none',
-      transition: 'border-color 0.3s ease, box-shadow 0.3s ease'
+      transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
     },
-    inputFocus: { borderColor: '#6610f2', boxShadow: '0 0 8px rgba(102,16,242,0.3)' },
+    inputFocus: {
+      borderColor: '#6610f2',
+      boxShadow: '0 0 8px rgba(102,16,242,0.3)',
+    },
     select: {
       width: '100%',
       padding: '0.5rem 0.75rem',
       borderRadius: '0.5rem',
       border: '1px solid #ced4da',
       outline: 'none',
-      transition: 'border-color 0.3s ease, box-shadow 0.3s ease'
+      transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
     },
     btn: {
       background: 'linear-gradient(90deg, #007bff, #6610f2)',
@@ -74,19 +116,36 @@ export default function Register() {
       fontWeight: '600',
       borderRadius: '50px',
       cursor: 'pointer',
-      transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+      transition: 'transform 0.3s ease, box-shadow 0.3s ease',
     },
-    btnHover: { transform: 'translateY(-3px)', boxShadow: '0 8px 18px rgba(0,0,0,0.2)' },
-    error: { marginBottom: '1rem', color: 'white', background: '#dc3545', padding: '0.5rem', borderRadius: '0.5rem', textAlign: 'center' },
-    footerLink: { fontSize: '0.9rem', textDecoration: 'none', color: '#6610f2' }
+    btnHover: {
+      transform: 'translateY(-3px)',
+      boxShadow: '0 8px 18px rgba(0,0,0,0.2)',
+    },
+    error: {
+      marginBottom: '1rem',
+      color: 'white',
+      background: '#dc3545',
+      padding: '0.5rem',
+      borderRadius: '0.5rem',
+      textAlign: 'center',
+    },
+    footerLink: { fontSize: '0.9rem', textDecoration: 'none', color: '#6610f2' },
   };
 
   return (
     <div style={styles.page}>
       <div
         style={styles.card}
-        onMouseEnter={e => Object.assign(e.currentTarget.style, styles.cardHover)}
-        onMouseLeave={e => Object.assign(e.currentTarget.style, { transform: 'none', boxShadow: '0 15px 35px rgba(0,0,0,0.15)' })}
+        onMouseEnter={(e) =>
+          Object.assign(e.currentTarget.style, styles.cardHover)
+        }
+        onMouseLeave={(e) =>
+          Object.assign(e.currentTarget.style, {
+            transform: 'none',
+            boxShadow: '0 15px 35px rgba(0,0,0,0.15)',
+          })
+        }
       >
         <div style={styles.header}>Create Your Account</div>
         <div style={{ padding: '2rem' }}>
@@ -99,7 +158,9 @@ export default function Register() {
                   style={styles.input}
                   placeholder="Your full name"
                   value={payload.name}
-                  onChange={e => setPayload({ ...payload, name: e.target.value })}
+                  onChange={(e) =>
+                    setPayload({ ...payload, name: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -108,7 +169,9 @@ export default function Register() {
                 <select
                   style={styles.select}
                   value={payload.role}
-                  onChange={e => setPayload({ ...payload, role: e.target.value })}
+                  onChange={(e) =>
+                    setPayload({ ...payload, role: e.target.value })
+                  }
                 >
                   <option>Student</option>
                   <option>Parent</option>
@@ -124,7 +187,9 @@ export default function Register() {
                 style={styles.input}
                 placeholder="example@mail.com"
                 value={payload.email}
-                onChange={e => setPayload({ ...payload, email: e.target.value })}
+                onChange={(e) =>
+                  setPayload({ ...payload, email: e.target.value })
+                }
                 required
               />
             </div>
@@ -135,20 +200,36 @@ export default function Register() {
                 style={styles.input}
                 placeholder="Enter a strong password"
                 value={payload.password}
-                onChange={e => setPayload({ ...payload, password: e.target.value })}
+                onChange={(e) =>
+                  setPayload({ ...payload, password: e.target.value })
+                }
                 required
               />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: '1.5rem',
+              }}
+            >
               <button
                 type="submit"
                 style={styles.btn}
-                onMouseEnter={e => Object.assign(e.currentTarget.style, styles.btnHover)}
-                onMouseLeave={e => Object.assign(e.currentTarget.style, styles.btn)}
+                disabled={loading}
+                onMouseEnter={(e) =>
+                  Object.assign(e.currentTarget.style, styles.btnHover)
+                }
+                onMouseLeave={(e) =>
+                  Object.assign(e.currentTarget.style, styles.btn)
+                }
               >
-                Create Account
+                {loading ? 'Creating Account...' : 'Create Account'}
               </button>
-              <a style={styles.footerLink} href="/login">Already registered?</a>
+              <a style={styles.footerLink} href="/login">
+                Already registered?
+              </a>
             </div>
           </form>
         </div>

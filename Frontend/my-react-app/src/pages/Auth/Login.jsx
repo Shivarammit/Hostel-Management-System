@@ -6,19 +6,37 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
-  const { login } = useAuth();
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
+  // If you want user to select role:
+  const [role, setRole] = useState('student');
+  // Set to 'student', 'parent', 'rc', 'admin' as needed
 
-  const onSubmit = async (e) => {
-    e.preventDefault();
-    setError(null);
-    try {
-      const u = await login(email, password);
-      navigate(`/${u.role.toLowerCase()}`);
-    } catch (err) {
-      setError(err.message);
+  // Map role to backend endpoint
+  const getLoginUrl = (role) => {
+    switch (role) {
+      case "student": return "http://localhost:8000/student/login";
+      case "parent": return "http://localhost:8000/parent/login";
+      case "rc": return "http://localhost:8000/rc/login";
+      case "admin": return "http://localhost:8000/admin/login";
+      default: return "http://localhost:8000/student/login";
     }
   };
+
+  const onSubmit = async (e) => {
+  e.preventDefault();
+  setError(null);
+  setLoading(true);
+  try {
+    await login(email, password, role);  // pass role from select input
+    navigate(`/${role}dashboard`);
+  } catch (err) {
+    setError(err.message || "Login failed");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const styles = {
     page: {
@@ -74,6 +92,7 @@ export default function Login() {
     footerLink: { fontSize: '0.9rem', textDecoration: 'none', color: '#6610f2' }
   };
 
+
   return (
     <div style={styles.page}>
       <div
@@ -85,9 +104,20 @@ export default function Login() {
         <div style={{ padding: '2rem' }}>
           {error && <div style={styles.error}>{error}</div>}
           <form onSubmit={onSubmit}>
+            {/* Optionally let user select their role */}
+            <select
+              value={role}
+              onChange={e => setRole(e.target.value)}
+              style={{ marginBottom: "1rem", width: "100%", padding: "0.5rem", borderRadius: "0.5rem" }}
+            >
+              <option value="student">Student</option>
+              <option value="parent">Parent</option>
+              <option value="rc">RC</option>
+              <option value="admin">Admin</option>
+            </select>
             <input
-              type="email"
-              placeholder="Email"
+              type="text"
+              placeholder="username"
               value={email}
               style={styles.input}
               onChange={e => setEmail(e.target.value)}
@@ -105,10 +135,11 @@ export default function Login() {
               <button
                 type="submit"
                 style={styles.btn}
+                disabled={loading}
                 onMouseEnter={e => Object.assign(e.currentTarget.style, styles.btnHover)}
                 onMouseLeave={e => Object.assign(e.currentTarget.style, styles.btn)}
               >
-                Sign In
+                {loading ? "Signing In..." : "Sign In"}
               </button>
               <a style={styles.footerLink} href="/register">New Register?</a>
             </div>

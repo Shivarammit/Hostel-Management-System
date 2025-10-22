@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '../../api/mockApi';
 
 export default function RCAttendance() {
   const [students, setStudents] = useState([]);
@@ -7,24 +6,43 @@ export default function RCAttendance() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(true);
 
-  // Load students and attendance
   useEffect(() => {
     async function load() {
-      const s = await api.fetchStudents();
-      setStudents(s);
-      const att = await api.getAttendance(date);
-      setRecords(att);
+      // Fetch student list
+      const studentsRes = await fetch('http://localhost:8000/api/students');
+      const studentsData = await studentsRes.json();
+      setStudents(studentsData.students || []);
+
+      // Fetch attendance for selected date
+      const attendanceRes = await fetch(`http://localhost:8000/rc/view_records/${date}`);
+      const attendanceData = await attendanceRes.json();
+      // Convert attendance array to record map { stu_id: true/false }
+      const recordMap = {};
+      (attendanceData.attendance_records || []).forEach((record) => {
+        recordMap[record.stu_id] = record.attendance === 'present';
+      });
+      setRecords(recordMap);
       setLoading(false);
     }
     load();
   }, [date]);
 
-  // Toggle present/absent
-  const toggle = (id) => setRecords(r => ({ ...r, [id]: !r[id] }));
+  const toggle = (id) => setRecords((r) => ({ ...r, [id]: !r[id] }));
 
-  // Save attendance
   const save = async () => {
-    await api.markAttendance(date, records);
+    await Promise.all(
+      students.map((student) =>
+        fetch('http://localhost:8000/rc/update_attendance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            stu_id: student.id,
+            attendance: records[student.id] ? 'present' : 'absent',
+            date,
+          }),
+        })
+      )
+    );
     alert('Attendance saved successfully');
   };
 
@@ -38,7 +56,7 @@ export default function RCAttendance() {
           type="date"
           className="form-control w-auto"
           value={date}
-          onChange={e => setDate(e.target.value)}
+          onChange={(e) => setDate(e.target.value)}
         />
       </div>
 
@@ -69,7 +87,9 @@ export default function RCAttendance() {
         </tbody>
       </table>
 
-      <button className="btn btn-primary" onClick={save}>Save Attendance</button>
+      <button className="btn btn-primary" onClick={save}>
+        Save Attendance
+      </button>
     </div>
   );
 }
