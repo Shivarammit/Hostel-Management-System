@@ -2,17 +2,25 @@
   import { useAuth } from "../../contexts/AuthContext";
 
   export default function GatePassCreate() {
-    const user = useAuth();
+    const {user} = useAuth();
     const [reason, setReason] = useState("");
     const [fromDate, setFromDate] = useState("");
     const [toDate, setToDate] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [gatePasses, setGatePasses] = useState([]);
 
+
+
     const fetchGatePasses = async () => {
       const res = await fetch("http://localhost:8000/api/gatepasses");
       const data = await res.json();
-      const myPasses = data.filter((g) => g.studentId === user.id);
+      console.log("pass",data);
+      console.log("id",user.id);
+      let myPasses;
+      if(myPasses){
+      myPasses = data.filter((data1) =>  data1.stu_id === user.id);}
+      // 
+      console.log("passes",myPasses[0].parent_ack, myPasses[0].rc_ack);
       setGatePasses(myPasses);
     };
 
@@ -26,14 +34,15 @@
       }
       setSubmitting(true);
       try {
+        console.log("req",user.id,reason,fromDate,toDate);
         await fetch("http://localhost:8000/api/gatepasses", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             studentId: user.id,
             reason,
-            fromDate,     // must be yyyy-mm-dd
-            toDate        // must be yyyy-mm-dd
+            fromDate:fromDate,     // must be yyyy-mm-dd
+            toDate:toDate       // must be yyyy-mm-dd
           }),
         });
         alert("Gate pass created successfully");
@@ -90,11 +99,24 @@
                 gatePasses.map((gp) => (
                   <tr key={gp.id}>
                     <td>{gp.reason}</td>
-                    <td>{gp.fromDate}</td>
-                    <td>{gp.toDate}</td>
-                    <td>{gp.parentApproved ? "Approved" : gp.status === "Rejected" ? "Rejected" : "Pending"}</td>
-                    <td>{gp.rcApproved ? "Approved" : gp.status === "Rejected" ? "Rejected" : gp.status === "Pending-RC" ? "Pending" : ""}</td>
-                    <td><strong>{gp.status}</strong></td>
+                    <td>{gp.from_date}</td>
+                    <td>{gp.to_date}</td>
+                     <td>
+  {gp.parent_ack === "Pending"
+    ? "Pending"
+    : gp.parent_ack === "Approved"
+    ? "Approved"
+    : gp.parent_ack}
+</td>
+
+<td>
+  {gp.rc_ack === "Pending"
+    ? "Pending"
+    : gp.rc_ack === "Approved"
+    ? "Approved"
+    : gp.rc_ack}
+</td>
+                     <td><strong>{gp.status}</strong></td>
                   </tr>
                 ))
               )}

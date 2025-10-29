@@ -25,24 +25,34 @@ export const AuthProvider = ({ children }) => {
 
   // Accepts username, password, and role to call corresponding endpoint
   const login = async (username, password, role) => {
-    setLoading(true);
-    try {
-      const endpoint = getEndpointForRole(role);
-      const res = await fetch(`http://localhost:8000/${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || "Login failed");
-      }
-      setUser(data.user);
-      return data.user;
-    } finally {
-      setLoading(false);
+  setLoading(true);
+  try {
+    const endpoint = getEndpointForRole(role);
+    const res = await fetch(`http://localhost:8000/${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+
+    const data = await res.json();
+    console.log("data", data);
+
+    if (!res.ok) {
+      throw new Error(data.detail || "Login failed");
     }
-  };
+
+    // Assuming the backend returns a full user object like:
+    // { username: "...", email: "...", role: "...", token: "..." }
+    data.user.role=role;
+    setUser(data.user);  // store the full user object
+    console.log("Logged in user:",  data);
+
+    return data;  // return the full user object
+  } finally {
+    setLoading(false);
+  }
+};
+
 
 
   // Maps UI role to backend route

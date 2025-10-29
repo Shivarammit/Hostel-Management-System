@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function Login() {
-  // UI always calls this 'username', even though labeled email
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
@@ -11,7 +10,6 @@ export default function Login() {
   const [role, setRole] = useState('student');
   const navigate = useNavigate();
   const { login } = useAuth();
-
   const styles = {
     page: {
       minHeight: '100vh',
@@ -73,9 +71,13 @@ export default function Login() {
     try {
       // Always sends username, which may be email or an identifier, as per DB
       const loggedUser = await login(username, password, role);
-      switch (loggedUser.role.toLowerCase()) {
-        case 'student': navigate('/studentdashboard'); break;
-        case 'parent':  navigate('/parentdashboard');  break;
+      console.log(loggedUser);
+      console.log("logged");  
+      const role1=role.toLowerCase();
+      console.log("role ",loggedUser.user.id);
+      switch (role1) {
+        case 'student':  navigate('/studentdashboard'); break;
+        case 'parent':  navigate("/parentdashboard", { state: { student_id: loggedUser.user.student_id } });  break;
         case 'rc':      navigate('/rcdashboard');      break;
         case 'admin':   navigate('/admindashboard');   break;
         default:        navigate('/');
@@ -124,6 +126,7 @@ export default function Login() {
               onChange={e => setPassword(e.target.value)}
               required
             />
+            
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem' }}>
               <button
                 type="submit"
