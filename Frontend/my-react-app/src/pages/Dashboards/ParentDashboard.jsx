@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
+
 
 // Example Bootstrap-style card wrapper (replace/className as needed)
 function Card({ title, children }) {
@@ -11,40 +13,87 @@ function Card({ title, children }) {
 }
 
 export default function ParentDashboard() {
-  const [studentId, setStudentId] = useState(""); // Set this after login or via prop/state
+  
+const location = useLocation();
+const { student_id } = location.state || {};
   const [feeRecords, setFeeRecords] = useState([]);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [gatePasses, setGatePasses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // You may want to retrieve student's ID from context/session
-  useEffect(() => {
-    // Set actual studentId when parent logs in
-    setStudentId("STUDENT_ID_HERE"); // <-- Replace or get from context
-  }, []);
+
+ function approve(id) {
+  fetch("http://localhost:8000/parent/approve_gatepass", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      approval_id: id,
+      approved: true,
+    }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      alert(data.msg);
+      setGatePasses((prev) =>
+        prev.map((gp) =>
+          gp.id === id ? { ...gp, status: "Pending(RC Approval)", parent_ack: "Approved" } : gp
+        )
+      );
+    })
+    .catch((err) => console.error("Error approving gatepass:", err));
+}
+
+function reject(id) {
+  fetch("http://localhost:8000/parent/approve_gatepass", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      approval_id: id,
+      approved: false,
+    }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      alert(data.msg);
+      // Refresh gatepass list
+      setGatePasses((prev) =>
+        prev.map((gp) =>
+          gp.id === id ? { ...gp, status: "Rejected", parent_ack: "Rejected" } : gp
+        )
+      );
+    })
+    .catch((err) => console.error("Error rejecting gatepass:", err));
+}
+
 
   useEffect(() => {
-    if (!studentId) return;
+    console.log("parent top",student_id);
+    if (!student_id) return;
+    console.log("parent");
     async function fetchAll() {
       setLoading(true);
       setError(null);
       try {
-        const [records, passes] = await Promise.all([
-          fetch(`http://localhost:8000/parent/student_records/${studentId}`).then(res => res.json()),
-          fetch("http://localhost:8000/api/gatepasses").then(res => res.json()),
+        const [records] = await Promise.all([
+          fetch(`http://localhost:8000/parent/student_records/${student_id}`).then(res => res.json()),
         ]);
+
         setFeeRecords(records.fee_records || []);
         setAttendanceRecords(records.attendance_records || []);
         // Filter gate passes for this student
-        setGatePasses((passes || []).filter(gp => gp.stu_id === Number(studentId)));
+        setGatePasses(records.approval || []);
       } catch (e) {
         setError("Failed to fetch records.");
       }
       setLoading(false);
     }
     fetchAll();
-  }, [studentId]);
+  }, [student_id]);
 
   return (
     <div className="container my-4">
@@ -114,11 +163,22 @@ export default function ParentDashboard() {
                     <td>{gp.from_date}</td>
                     <td>{gp.to_date}</td>
                     <td>
-                      {gp.status === "Pending" && (
+                      {gp.status != "Approved" && (
                         <>
-                          <button className="btn btn-success btn-sm me-1">Approve</button>
-                          <button className="btn btn-danger btn-sm">Reject</button>
-                        </>
+                         <button
+  className="btn btn-success btn-sm me-1"
+  onClick={() => approve(gp.id)}
+>
+  Approve
+</button>
+<button
+  className="btn btn-danger btn-sm"
+  onClick={() => reject(gp.id)}
+>
+  Reject
+</button>
+
+                          </>
                       )}
                     </td>
                   </tr>

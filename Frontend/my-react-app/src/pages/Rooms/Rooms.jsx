@@ -4,19 +4,65 @@ export default function Rooms() {
   const [search, setSearch] = useState("");
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [rooms, setRooms] = useState([]);
+  const [rcList, setRcList] = useState([]);
+  const [selectedRcId, setSelectedRcId] = useState("");
 
+  // Fetch rooms
   useEffect(() => {
     fetch("http://localhost:8000/api/rooms")
       .then((res) => res.json())
-      .then((data) => setRooms(data.rooms || []));
+      .then((data) => setRooms(data.rooms || []))
+      .catch((err) => console.error("Error fetching rooms:", err));
+  }, []);
+console.log(rooms);
+  // Fetch RC list
+  useEffect(() => {
+    fetch("http://localhost:8000/admin/users/rc")
+      .then((res) => res.json())
+      .then((data) => setRcList(data.rcs || []))
+      .catch((err) => console.error("Error fetching RCs:", err));
   }, []);
 
-  const filteredRooms = rooms.filter(
-    (r) => r.roomNumber.toLowerCase().includes(search.toLowerCase())
+  // Filter rooms by search
+  const filteredRooms = rooms.filter((room) =>
+    room.room_number.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Handle RC assignment
+  const assignRcToRoom = async () => {
+    if (!selectedRoom || !selectedRcId) {
+      alert("Please select an RC first.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`http://localhost:8000/api/rooms/${selectedRoom.id}/assign_rc/${selectedRcId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" }
+      });
+
+      if (res.ok) {
+        alert("RC assigned successfully!");
+        // Update UI instantly
+        setRooms((prev) =>
+          prev.map((r) =>
+            r.id === selectedRoom.id ? { ...r, rc_id: selectedRcId } : r
+          )
+        );
+        setSelectedRoom({ ...selectedRoom, rc_id: selectedRcId });
+      } else {
+        alert("Failed to assign RC.");
+      }
+    } catch (err) {
+      console.error("Error assigning RC:", err);
+    }
+  };
+
   return (
     <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
       <h2 style={{ marginBottom: "20px" }}>Rooms Dashboard</h2>
+
+      {/* 🔍 Search Bar */}
       <input
         type="text"
         placeholder="Search by room number..."
@@ -31,37 +77,45 @@ export default function Rooms() {
           border: "1px solid #ccc",
         }}
       />
-      {Array.from(new Set(filteredRooms.map((r) => r.hostel.hostelName))).map((hostelName) => (
-        <div key={hostelName} style={{ marginBottom: "40px" }}>
-          <h3 style={{ color: "#1E90FF", marginBottom: "15px" }}>{hostelName} Hostel</h3>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "15px" }}>
-            {filteredRooms
-              .filter((r) => r.hostel.hostelName === hostelName)
-              .map((r) => (
-                <div
-                  key={r.id}
-                  onClick={() => setSelectedRoom(r)}
-                  style={{
-                    width: "120px",
-                    height: "120px",
-                    backgroundColor: "#f0f0f0",
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    borderRadius: "10px",
-                    boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
-                    cursor: "pointer",
-                    transition: "transform 0.2s",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                >
-                  <strong>{r.roomNumber}</strong>
-                </div>
-              ))}
+
+      {/* 🏠 Rooms Display */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "15px" }}>
+        {filteredRooms.length === 0 && <p>No rooms found.</p>}
+        {filteredRooms.map((r) => (
+          <div
+            key={r.id}
+            onClick={() => {
+              setSelectedRoom(r);
+              setSelectedRcId(r.rc_id || "");
+            }}
+            style={{
+              width: "120px",
+              height: "120px",
+              backgroundColor: r.availability === 0 ? "#ffb3b3" : "#b3ffb3",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              borderRadius: "10px",
+              boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
+              cursor: "pointer",
+              transition: "transform 0.2s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          >
+            <div style={{ textAlign: "center" }}>
+              <strong>{r.room_number}</strong>
+              <div style={{ fontSize: "12px", color: "#555" }}>
+                Beds: {r.availability}
+                <br />
+                RC ID: {r.rc_id || "—"}
+              </div>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
+
+      {/* 🪟 Room Modal */}
       {selectedRoom && (
         <div
           onClick={() => setSelectedRoom(null)}
@@ -90,32 +144,49 @@ export default function Rooms() {
               overflowY: "auto",
             }}
           >
-            <h3>Room {selectedRoom.roomNumber}</h3>
-            <p>
-              <strong>Hostel</strong>: {selectedRoom.hostel.hostelName}
-            </p>
-            <p>
-              <strong>RC</strong>: {selectedRoom.rcName}
-            </p>
-            <p>
-              <strong>Beds</strong>: {selectedRoom.beds}
-            </p>
-            <p>
-              <strong>Occupied</strong>: {selectedRoom.filled}
-            </p>
-            <hr />
-            <h4>Students</h4>
-            {selectedRoom.students.length === 0 ? (
-              <p>No students assigned</p>
-            ) : (
-              <ul>
-                {selectedRoom.students.map((s, idx) => (
-                  <li key={idx}>
-                    {s.name} ({s.phone})
-                  </li>
+            <h3>Room {selectedRoom.room_number}</h3>
+            <p><strong>Room ID:</strong> {selectedRoom.id}</p>
+            <p><strong>RC ID:</strong> {selectedRoom.rc_id || "—"}</p>
+            <p><strong>Beds Available:</strong> {selectedRoom.availability}</p>
+
+            {/* 🧑‍🏫 RC Assignment Section */}
+            <div style={{ marginTop: "20px" }}>
+              <h4>Assign / Change RC</h4>
+              <select
+                value={selectedRcId}
+                onChange={(e) => setSelectedRcId(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  marginTop: "10px",
+                  borderRadius: "5px",
+                  border: "1px solid #ccc",
+                }}
+              >
+                <option value="">Select RC</option>
+                {rcList.map((rc) => (
+                  <option key={rc.id} value={rc.id}>
+                    {rc.name} (ID: {rc.id})
+                  </option>
                 ))}
-              </ul>
-            )}
+              </select>
+              <button
+                onClick={assignRcToRoom}
+                style={{
+                  marginTop: "10px",
+                  padding: "10px 15px",
+                  backgroundColor: "#28a745",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "5px",
+                  cursor: "pointer",
+                }}
+              >
+                Assign RC
+              </button>
+            </div>
+
+            <hr />
             <button
               onClick={() => setSelectedRoom(null)}
               style={{

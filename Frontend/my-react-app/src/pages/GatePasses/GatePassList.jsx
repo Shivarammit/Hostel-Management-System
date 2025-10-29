@@ -12,12 +12,13 @@ export default function GatePassList() {
     const data = await res.json();
     let filtered;
     if (user.role === "Parent") {
-      filtered = data.filter((gp) => gp.status === "PendingParent");
+      filtered = data.filter((gp) => gp.status === "Pending(Parent Approval)");
     } else if (user.role === "RC") {
-      filtered = data.filter((gp) => gp.status === "PendingRC");
+      filtered = data.filter((gp) => gp.status === "Pending(RC Approval)");
     } else {
       filtered = data;
     }
+    console.log("fileteers", filtered);
     setGatePasses(filtered);
     setLoading(false);
   };
@@ -63,8 +64,6 @@ export default function GatePassList() {
               <th>Reason</th>
               <th>From</th>
               <th>To</th>
-              <th>Parent</th>
-              <th>RC</th>
               <th>Status</th>
               {(user.role === "Parent" || user.role === "RC") && (
                 <th>Actions</th>
@@ -83,9 +82,24 @@ export default function GatePassList() {
                   <td>{gp.reason}</td>
                   <td>{gp.fromDate}</td>
                   <td>{gp.toDate}</td>
-                  <td>{gp.parentApproved ? "Approved" : gp.status === "Rejected" ? "Rejected" : "Pending"}</td>
-                  <td>{gp.rcApproved ? "Approved" : gp.status === "Rejected" ? "Rejected" : gp.status === "Pending-RC" ? "Pending" : ""}</td>
-                  <td><strong>{gp.status}</strong></td>
+                  <td>{gp.status}</td>
+                 {/* <td>
+  {gp.parent_ack === "Pending"
+    ? "Pending"
+    : gp.parent_ack === "Approved"
+    ? "Approved"
+    : gp.parent_ack}
+</td>
+
+<td>
+  {gp.rc_ack === "Pending"
+    ? "Pending"
+    : gp.rc_ack === "Approved"
+    ? "Approved"
+    : gp.rc_ack}
+</td> */}
+
+                 <td><strong>{gp.status}</strong></td>
                   {(user.role === "Parent" || user.role === "RC") && (
                     <td>
                       <button onClick={() => handleApprove(gp.id)} className="btn btn-success btn-sm me-2">Approve</button>

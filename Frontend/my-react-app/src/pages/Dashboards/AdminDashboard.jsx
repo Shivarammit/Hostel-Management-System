@@ -8,25 +8,40 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch data from backend reports
     async function fetchStats() {
       setLoading(true);
-      // User stats (you need to make these endpoints or use /api/rooms and /admin/reports/fee_payment)
-      const [fee, attendance] = await Promise.all([
-        fetch('http://localhost:8000/admin/reports/fee_payment').then(res => res.json()),
-        fetch('http://localhost:8000/admin/reports/attendance').then(res => res.json())
-      ]);
-      setFeeReport(fee.fee_report || []);
-      setAttendanceReport(attendance.attendance_report || []);
-      // Dummy user count (replace with actual backend queries as needed)
-      setUsers({
-        students: fee.fee_report?.length || 0,
-        rc: "-", // You can fetch RC count separately if endpoint exists
-        parents: "-", // You can fetch Parent count similarly
-        admins: "-" // You can fetch Admin count similarly
-      });
+
+      try {
+        // Fetch reports
+        const [fee, attendance] = await Promise.all([
+          fetch('http://localhost:8000/admin/reports/fee_payment').then(res => res.json()),
+          fetch('http://localhost:8000/admin/reports/attendance').then(res => res.json()),
+        ]);
+
+        setFeeReport(fee.fee_report || []);
+        setAttendanceReport(attendance.attendance_report || []);
+
+        // Fetch user counts
+        const [studentRes, rcRes, parentRes, adminRes] = await Promise.all([
+          fetch("http://localhost:8000/admin/count/students").then(res => res.json()),
+          fetch("http://localhost:8000/admin/count/rc").then(res => res.json()),
+          fetch("http://localhost:8000/admin/count/parents").then(res => res.json()),
+          fetch("http://localhost:8000/admin/count/admins").then(res => res.json()),
+        ]);
+
+        setUsers({
+          students: studentRes.count || 0,
+          rc: rcRes.count || 0,
+          parents: parentRes.count || 0,
+          admins: adminRes.count || 0,
+        });
+      } catch (error) {
+        console.error("Error fetching stats:", error);
+      }
+
       setLoading(false);
     }
+
     fetchStats();
   }, []);
 
@@ -35,7 +50,7 @@ export default function AdminDashboard() {
       <div className="row g-4 mb-4">
         <div className="col-md-4">
           <ProCard title="Users">
-            Manage users, create & edit accounts.
+            Manage users
             <div className="mt-3">
               <div>Students: <strong>{users.students}</strong></div>
               <div>RCs: <strong>{users.rc}</strong></div>
@@ -45,12 +60,14 @@ export default function AdminDashboard() {
             </div>
           </ProCard>
         </div>
+
         <div className="col-md-4">
           <ProCard title="Rooms">
             Create, edit rooms and allocate beds.
             <a href="/admin/rooms" className="d-block mt-2">Open Rooms</a>
           </ProCard>
         </div>
+
         <div className="col-md-4">
           <ProCard title="Reports">
             Fee & attendance reports.
@@ -63,7 +80,7 @@ export default function AdminDashboard() {
         <div className="col-md-6">
           <ProCard title="Fee Payment Status">
             {loading ? <div>Loading...</div> : (
-              <div style={{maxHeight:200,overflowY:'auto'}}>
+              <div style={{ maxHeight: 200, overflowY: 'auto' }}>
                 <table className="table table-bordered table-sm">
                   <thead>
                     <tr>
@@ -85,10 +102,11 @@ export default function AdminDashboard() {
             <a href="/admin/reports/fee_payment" className="d-block text-end small mt-1">See All</a>
           </ProCard>
         </div>
+
         <div className="col-md-6">
           <ProCard title="Attendance Report">
             {loading ? <div>Loading...</div> : (
-              <div style={{maxHeight:200,overflowY:'auto'}}>
+              <div style={{ maxHeight: 200, overflowY: 'auto' }}>
                 <table className="table table-bordered table-sm">
                   <thead>
                     <tr>

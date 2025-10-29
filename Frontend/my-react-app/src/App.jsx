@@ -19,6 +19,8 @@ import Fees from "./pages/Fees/Fees";
 import Rooms from "./pages/Rooms/Rooms";
 import Reports from "./pages/Reports/Reports";
 
+import AdminUsers from "./AdminUsers";
+
 import RoleNavBar from "./components/RoleNavBar";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useAuth } from "./contexts/AuthContext";
@@ -115,6 +117,13 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute roles={["Admin"]}>
+                <AdminUsers />
+              </ProtectedRoute>
+            }/>
           <Route
             path="/admin/rooms"
             element={

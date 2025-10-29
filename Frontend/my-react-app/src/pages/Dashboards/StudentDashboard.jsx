@@ -36,7 +36,6 @@ export default function StudentDashboard() {
 
   const downloadReceipt = async () => {
     if (!user || !user.student_id) return alert("User ID missing");
-
     const res = await fetch(`http://localhost:8000/student/fee_receipt/${user.student_id}`);
     if (res.ok) {
       const data = await res.json();
@@ -53,7 +52,7 @@ export default function StudentDashboard() {
     <div className="row g-3">
       <div className="col-lg-4">
         <ProCard title="Profile">
-          <p><strong>Name:</strong> {user.name || "Unknown"}</p>
+          <p><strong>Name:</strong> {user.username || "Unknown"}</p>
           <p><strong>Email:</strong> {user.email || "Unknown"}</p>
           <p><strong>Room:</strong> {room}</p>
         </ProCard>
