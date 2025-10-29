@@ -4,7 +4,6 @@ from typing import Optional
 import sqlite3
 from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
-DATABASE = "hms.db"
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173"
@@ -17,6 +16,8 @@ app.add_middleware(
     allow_methods=["*"],               # Allow all HTTP methods
     allow_headers=["*"],               # Allow all headers
 )
+
+DATABASE = r"C:\Users\user\OneDrive\Desktop\New folder\Hostel-Management-System\hms.db"
 def get_db():
     conn = sqlite3.connect(DATABASE, check_same_thread=False)
     conn.row_factory = sqlite3.Row
@@ -39,13 +40,7 @@ class AttendanceUpdate(BaseModel):
     attendance: str
     date: str
 
-class GatepassApproval(BaseModel):
-    approval_id: int
-    approved: bool
 
-class ParentLogin(BaseModel):
-    username: str
-    password: str
 
 class StudentLogin(BaseModel):
     username: str
@@ -144,34 +139,9 @@ def rc_view_records(student_id: int, db=Depends(get_db)):
     attendance = [dict(row) for row in c.fetchall()]
     return {"fee_records": fees, "attendance_records": attendance}
 
-# FR-7: Parent Login
-@app.post("/parent/login")
-def parent_login(login: ParentLogin, db=Depends(get_db)):
-    c = db.cursor()
-    c.execute("SELECT * FROM Parent WHERE username=? AND password=?", (login.username, login.password))
-    user = c.fetchone()
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    return {"msg": "Login successful", "parent_id": user['id']}
 
-# FR-8: Approve/Reject Gatepass
-@app.post("/parent/approve_gatepass")
-def approve_gatepass(approval: GatepassApproval, db=Depends(get_db)):
-    status = 'approved' if approval.approved else 'rejected'
-    c = db.cursor()
-    c.execute("UPDATE Approval SET status=?, parent_ack=? WHERE id=?", (status, status, approval.approval_id))
-    db.commit()
-    return {"msg": f"Gatepass {status}"}
 
-# FR-9: Parent Views Student Records (fee and attendance)
-@app.get("/parent/student_records/{student_id}")
-def parent_view_student_records(student_id: int, db=Depends(get_db)):
-    c = db.cursor()
-    c.execute("SELECT * FROM Fee WHERE student_id=?", (student_id,))
-    fees = [dict(row) for row in c.fetchall()]
-    c.execute("SELECT * FROM Attendance WHERE stu_id=?", (student_id,))
-    attendance = [dict(row) for row in c.fetchall()]
-    return {"fee_records": fees, "attendance_records": attendance}
+
 
 # FR-10: Student Login
 @app.post("/student/login")
@@ -179,9 +149,10 @@ def student_login(login: StudentLogin, db=Depends(get_db)):
     c = db.cursor()
     c.execute("SELECT * FROM Student WHERE username=? AND password=?", (login.username, login.password))
     user = c.fetchone()
+    print(user)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    return {"msg": "Login successful", "student_id": user['id']}
+    return {"msg": "Login successful", "user":user}
 
 # FR-11: Pay Fees
 @app.post("/student/pay_fee")
