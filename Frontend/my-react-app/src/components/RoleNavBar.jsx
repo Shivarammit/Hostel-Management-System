@@ -89,7 +89,7 @@ function RoleNavBar() {
         {user && (
           <div className="d-flex align-items-center">
             <span className="text-white me-3">
-              {user.name} ({user.role})
+            Welcome  {user.username}
             </span>
             <button className="btn btn-outline-light btn-sm" onClick={logout}>
               Logout

@@ -28,6 +28,7 @@ export const AuthProvider = ({ children }) => {
   setLoading(true);
   try {
     const endpoint = getEndpointForRole(role);
+    console.log("end",endpoint);
     const res = await fetch(`http://localhost:8000/${endpoint}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -36,11 +37,11 @@ export const AuthProvider = ({ children }) => {
 
     const data = await res.json();
     console.log("data", data);
+    // setUser(data);
 
     if (!res.ok) {
       throw new Error(data.detail || "Login failed");
     }
-
     // Assuming the backend returns a full user object like:
     // { username: "...", email: "...", role: "...", token: "..." }
     data.user.role=role;

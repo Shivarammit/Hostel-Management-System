@@ -11,16 +11,18 @@ import StudentDashboard from "./pages/Dashboards/StudentDashboard";
 
 import GatePassList from "./pages/GatePasses/GatePassList";
 import GatePassCreate from "./pages/GatePasses/GatePassCreate";
-
+import GatePassStatus from "./pages/GatePasses/GatePassStatus";
 import Attendance from "./pages/Attendance/Attendance";
 import RCAttendance from "./pages/Attendance/RCAttendance";
+import ListAttendance from './pages/Attendance/ListAttendance';
 
 import Fees from "./pages/Fees/Fees";
+import ListFeePaid from "./pages/Fees/ListFeePaid";
 import Rooms from "./pages/Rooms/Rooms";
 import Reports from "./pages/Reports/Reports";
 
 import AdminUsers from "./AdminUsers";
-
+import HostelFeeReport from './pages/Reports/HostelFeeReport';
 import RoleNavBar from "./components/RoleNavBar";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useAuth } from "./contexts/AuthContext";
@@ -133,6 +135,26 @@ function App() {
             }
           />
           <Route
+            path="/admin/reports/fee_payment"
+            element={
+              <ProtectedRoute roles={["Admin"]}>
+                <ListFeePaid />
+              </ProtectedRoute>
+            }
+          />
+          
+<Route path="/admin/reports/hostel_fee" element={<HostelFeeReport />} />
+          
+
+          <Route
+            path="admin/reports/attendance"
+            element={
+              <ProtectedRoute roles={["Admin"]}>
+                <ListAttendance />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/admin/reports"
             element={
               <ProtectedRoute roles={["Admin"]}>
@@ -150,6 +172,15 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/student/gatepass/status"
+            element={
+              <ProtectedRoute>
+                <GatePassStatus />
+              </ProtectedRoute>
+            }
+          />
+
 
           {/* ----------- FEES (Student, Parent, Admin) ----------- */}
           <Route

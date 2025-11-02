@@ -72,7 +72,7 @@ function reject(id) {
 
 
   useEffect(() => {
-    console.log("parent top",student_id);
+    console.log("parent top");
     if (!student_id) return;
     console.log("parent");
     async function fetchAll() {
@@ -82,9 +82,10 @@ function reject(id) {
         const [records] = await Promise.all([
           fetch(`http://localhost:8000/parent/student_records/${student_id}`).then(res => res.json()),
         ]);
-
+        console.log(records);
         setFeeRecords(records.fee_records || []);
         setAttendanceRecords(records.attendance_records || []);
+        console.log("status", records.status);
         // Filter gate passes for this student
         setGatePasses(records.approval || []);
       } catch (e) {
@@ -162,25 +163,40 @@ function reject(id) {
                     <td>{gp.status}</td>
                     <td>{gp.from_date}</td>
                     <td>{gp.to_date}</td>
-                    <td>
-                      {gp.status != "Approved" && (
-                        <>
-                         <button
-  className="btn btn-success btn-sm me-1"
-  onClick={() => approve(gp.id)}
->
-  Approve
-</button>
-<button
-  className="btn btn-danger btn-sm"
-  onClick={() => reject(gp.id)}
->
-  Reject
-</button>
+                    
+{console.log("sttaus",gp)}
+    <td>
+  {gp.parent_ack === "Pending" ? (
+    <>
+      <button
+        className="btn btn-success btn-sm me-1"
+        onClick={() => approve(gp.id)}
+      >
+        Approve
+      </button>
+      <button
+        className="btn btn-danger btn-sm"
+        onClick={() => reject(gp.id)}
+      >
+        Reject
+      </button>
+    </>
+  ) : gp.status === "Approved" ? (
+    <button className="btn btn-success btn-sm" disabled>
+      Approved
+    </button>
+  ) : gp.status === "Rejected" ? (
+    <button className="btn btn-danger btn-sm" disabled>
+      Rejected
+    </button>
+  ) : gp.rc_ack === "Pending" ? (
+    <button className="btn btn-warning btn-sm" disabled>
+      Pending
+    </button>
+  ) : null}
+</td>
 
-                          </>
-                      )}
-                    </td>
+
                   </tr>
                 ))}
               </tbody>

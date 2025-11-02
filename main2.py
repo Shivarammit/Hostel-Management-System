@@ -1,15 +1,19 @@
-from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from datetime import datetime
 import sqlite3
+import os,sys
+from datetime import datetime
+from fastapi import FastAPI, Request,UploadFile, Form, Depends, HTTPException, File 
 
 app = FastAPI()
-
+import subprocess
 # CORS configuration for React frontend
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://hms-frontend-react.s3-website.ap-south-1.amazonaws.com",
+    "https://hms-frontend-react.s3-website.ap-south-1.amazonaws.com",
 ]
 
 app.add_middleware(
@@ -20,6 +24,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
+# DATABASE = os.path.join(os.path.dirname(__file__), "hms.db")
 DATABASE = r"C:\Users\user\OneDrive\Desktop\New folder\Hostel-Management-System\hms.db"
 
 def get_db():
@@ -62,7 +71,26 @@ class ParentLogin(BaseModel):
 class StudentLogin(BaseModel):
     username: str
     password: str
+class FeeCollectionRequest(BaseModel):
+    semester: int
+    amount: float
 
+class RoomAllocationRequest(BaseModel):
+    student_id: int
+    room_id: int
+
+class AttendanceUpdate(BaseModel):
+    stu_id: int
+    attendance: str
+    date: str
+
+class StudentLogin(BaseModel):
+    username: str
+    password: str
+
+class PaymentRequest(BaseModel):
+    student_id: int
+    amount: float
 class ParentLogin(BaseModel):
     username: str
     password: str
@@ -82,7 +110,7 @@ class StudentRegister(BaseModel):
     email: str
     phone: str
     semester: int
-
+    face_image: str  # base64 image string from frontend
 class ParentRegister(BaseModel):
     username: str
     password: str
@@ -103,6 +131,311 @@ class AdminRegister(BaseModel):
 class GatepassApproval(BaseModel):
     approval_id: int
     approved: bool
+class ApprovalUpdate(BaseModel):
+    rc_id: int
+    action: str  
+class HostelFee(BaseModel):
+    program: str       # e.g., "BE", "ME", "MBA"
+    semester: int           # Semester number (integer)
+    amount: float         # Hostel fee amount
+    deadline: str      # e.g., "2025-12-31"
+    fine: float | None = None  # Optional fine amount
+
+@app.get("/start-attendance")
+def start_attendance(request: Request):
+    try:
+        script_path = r"C:\Users\user\OneDrive\Desktop\New folder\Hostel-Management-System\Attendance\AutoMark\test.py"
+        working_dir = os.path.dirname(script_path)
+
+        # Start script (non-blocking)
+        process = subprocess.Popen(["python", script_path], cwd=working_dir)
+
+        if process.poll() is None:
+            # Process started successfully
+            return ({"message": "✅ Attendance recording started"})
+        else:
+            # Process failed immediately
+            return ({"message": "⚠️ Could not start attendance recording"})
+
+    except Exception as e:
+        return ({"message": f"❌ Error: {str(e)}"})
+    
+@app.get('/api/hostel_fee/{id}')
+def get_hostel_fee(id: int, db=Depends(get_db)):
+    c = db.cursor()
+    print(f"\n🟩 START: Fetching hostel fee details for Student ID = {id}")
+
+    # Step 1: Get student's program and semester
+    c.execute("SELECT Program, semester FROM Student WHERE id = ?", (id,))
+    student = c.fetchone()
+    print("➡️ Step 1: Student fetched:", dict(student) if student else None)
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    program = student["Program"]
+    sem = student["semester"]
+    print(f"   └─ Program: {program}, Semester: {sem}")
+
+    # Step 2: Find matching hostel fee record
+    c.execute("SELECT * FROM Hostel_Fee WHERE program = ? AND sem = ?", (program, sem))
+    hostel_fee = c.fetchone()
+    print("➡️ Step 2: Hostel fee record:", dict(hostel_fee) if hostel_fee else None)
+    if not hostel_fee:
+        raise HTTPException(status_code=404, detail="No hostel fee record found for this student")
+
+    fee_id = hostel_fee["id"]
+    fee_amount = hostel_fee["fee"]
+    fine = hostel_fee["fine"]
+    deadline = hostel_fee["deadline"]
+    print(f"   └─ Fee ID: {fee_id}, Fee: {fee_amount}, Fine: {fine}, Deadline: {deadline}")
+
+    # Step 3: Check if already paid
+    c.execute("""
+        SELECT * FROM StudentTransaction
+        WHERE stu_id = ? AND Hostel_fee_id = ? AND status = 'Paid'
+        ORDER BY time DESC LIMIT 1
+    """, (id, fee_id))
+    transaction = c.fetchone()
+    print("➡️ Step 3: Transaction fetched:", dict(transaction) if transaction else None)
+
+    # Step 4: Handle already paid case
+    if transaction:
+        total_payable = transaction["amount"]
+        fine_amount = total_payable - fee_amount if total_payable > fee_amount else 0
+        print("✅ Step 4: Student already paid")
+        print(f"   └─ Total Paid: {total_payable}, Fine in Payment: {fine_amount}, Paid On: {transaction['time']}")
+
+        return {
+            "student_id": id,
+            "program": program,
+            "semester": sem,
+            "fee_amount": fee_amount,
+            "fine": fine_amount,
+            "deadline": deadline,
+            "status": "Paid",
+            "total_payable": total_payable,
+            "paid_on": transaction["time"]
+        }
+
+    # Step 5: Fine calculation (only if not paid)
+    current_date = datetime.now().date()
+    deadline_date = datetime.strptime(deadline, "%Y-%m-%d").date()
+    fine_amount = 0
+    total_amount = fee_amount
+
+    print(f"➡️ Step 5: Fine calculation")
+    print(f"   └─ Current Date: {current_date}, Deadline: {deadline_date}")
+
+    if current_date > deadline_date:
+        days_late = (current_date - deadline_date).days  # Number of days late
+        fine_amount = fine * days_late                   # Fine increases per day
+        total_amount += fine_amount   
+        print(f"   └─ Fine applied: {fine_amount}")
+    else:
+        print("   └─ No fine applied (before deadline)")
+
+    # Step 6: Return pending payment details
+    print("✅ Step 6: Returning pending payment details")
+    print(f"   └─ Total Payable: {total_amount}, Status: Pending, fine(per day):{fine}\n")
+
+    return {
+        "student_id": id,
+        "program": program,
+        "semester": sem,
+        "fee_amount": fee_amount,
+        "fine": fine,
+        "deadline": deadline,
+        "status": "Pending",
+        "total_payable": total_amount
+    }
+
+# ✅ Pay Hostel Fee
+@app.post("/api/pay_hostel_fee/{student_id}")
+def pay_hostel_fee(student_id: int, db=Depends(get_db)):
+    c = db.cursor()
+
+    # 1️⃣ Get student's program and semester
+    c.execute("SELECT Program, semester FROM Student WHERE id = ?", (student_id,))
+    student = c.fetchone()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    program = student["Program"]
+    sem = student["semester"]
+
+    # 2️⃣ Get matching hostel fee
+    c.execute("SELECT * FROM Hostel_Fee WHERE program = ? AND sem = ?", (program, sem))
+    hostel_fee = c.fetchone()
+    if not hostel_fee:
+        raise HTTPException(status_code=404, detail="No hostel fee record found")
+
+    fee_id = hostel_fee["id"]
+    fee_amount = hostel_fee["fee"]
+    fine = hostel_fee["fine"]
+    deadline = hostel_fee["deadline"]
+
+    # 3️⃣ Check if already paid
+    c.execute("""
+        SELECT * FROM StudentTransaction
+        WHERE stu_id = ? AND Hostel_fee_id = ? AND status = 'Paid'
+    """, (student_id, fee_id))
+    if c.fetchone():
+        return {"message": "Already paid", "status": "Paid"}
+
+    # 4️⃣ Fine calculation (if past deadline)
+    current_date = datetime.now().date()
+    deadline_date = datetime.strptime(deadline, "%Y-%m-%d").date()
+    total_amount = fee_amount
+    if current_date > deadline_date:
+        total_amount += fine
+
+    # 5️⃣ Insert new transaction record
+    c.execute("""
+        INSERT INTO StudentTransaction (stu_id, status, amount, time, Hostel_fee_id)
+        VALUES (?, 'Paid', ?, ?, ?)
+    """, (student_id, total_amount, datetime.now(), fee_id))
+    db.commit()
+
+    return {
+        "message": "Payment successful",
+        "student_id": student_id,
+        "amount": total_amount,
+        "status": "Paid"
+    }
+@app.get("/student/fee_receipt/{student_id}")
+def get_fee_receipt(student_id: int, db=Depends(get_db)):
+    c = db.cursor()
+
+    c.execute("""
+        SELECT st.id, st.amount, st.time, hf.program, hf.sem, s.username, s.email
+        FROM StudentTransaction st
+        JOIN Hostel_Fee hf ON st.Hostel_fee_id = hf.id
+        JOIN Student s ON s.id = st.stu_id
+        WHERE st.stu_id = ? AND st.status = 'Paid'
+        ORDER BY st.time DESC LIMIT 1
+    """, (student_id,))
+    transaction = c.fetchone()
+
+    if not transaction:
+        raise HTTPException(status_code=404, detail="No paid transaction found")
+
+    receipt = {
+        "transaction_id": transaction["id"],
+        "student_name": transaction["username"],
+        "email": transaction["email"],
+        "program": transaction["program"],
+        "semester": transaction["sem"],
+        "amount": transaction["amount"],
+        "date": transaction["time"],
+        "status": "Paid"
+    }
+
+    return {"receipt": receipt}
+
+@app.post("/admin/hostel_fee_details")
+def add_hostel_fee(fee_data: HostelFee, db=Depends(get_db)):
+    c = db.cursor()
+    try:
+        c.execute(
+            """
+            INSERT INTO Hostel_Fee (program, sem, fee, deadline, fine)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (fee_data.program, fee_data.semester, fee_data.amount, fee_data.deadline, fee_data.fine),
+        )
+        db.commit()
+        return {"msg": "✅ Hostel fee details added successfully!"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+@app.get("/admin/reports/hostel_fee")
+def get_hostel_fee_report(db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("SELECT * FROM Hostel_Fee ORDER BY id DESC")
+    data = [dict(row) for row in c.fetchall()]
+    return {"data": data}
+
+
+@app.get("/rc/verify_gatepass/{approval_id}")
+def verify_gatepass(approval_id: int, db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("SELECT status, parent_ack FROM Approval WHERE id=?", (approval_id,))
+    approval = c.fetchone()
+    if not approval:
+        raise HTTPException(status_code=404, detail="Gatepass request not found")
+    allowed = approval['status'] == 'approved' and approval['parent_ack'] == 'approved'
+    return {"allowed": allowed, "status": approval['status'], "parent_ack": approval['parent_ack']}
+
+# FR-6: View Records (RC views fee and attendance)
+@app.get("/rc/view_records/{student_id}")
+def rc_view_records(student_id: int, db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("SELECT * FROM Fee WHERE student_id=?", (student_id,))
+    fees = [dict(row) for row in c.fetchall()]
+    c.execute("SELECT * FROM Attendance WHERE stu_id=?", (student_id,))
+    attendance = [dict(row) for row in c.fetchall()]
+    return {"fee_records": fees, "attendance_records": attendance}
+
+
+
+
+
+# FR-10: Student Login
+@app.post("/student/login")
+def student_login(login: StudentLogin, db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("SELECT * FROM Student WHERE username=? AND password=?", (login.username, login.password))
+    user = c.fetchone()
+    print(user)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return {"msg": "Login successful", "user":user}
+
+# FR-11: Pay Fees
+@app.post("/student/pay_fee")
+def pay_fee(payment: PaymentRequest, db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("UPDATE Fee SET status='paid', amount=? WHERE student_id=? AND status='pending'",
+              (payment.amount, payment.student_id))
+    if c.rowcount == 0:
+        raise HTTPException(status_code=400, detail="No pending fee found")
+    db.commit()
+    return {"msg": "Payment successful"}
+
+# FR-12: Download Receipt (latest paid fee)
+@app.get("/student/fee_receipt/{student_id}")
+def download_receipt(student_id: int, db=Depends(get_db)):
+    c = db.cursor()
+    c.execute("SELECT * FROM Fee WHERE student_id=? AND status='paid' ORDER BY id DESC LIMIT 1", (student_id,))
+    receipt = c.fetchone()
+    if not receipt:
+        raise HTTPException(status_code=404, detail="No paid fee found")
+    return {"receipt": dict(receipt)}
+@app.post("/rc/gatepass/{id}/action")
+def update_gatepass_status(id: int, data: ApprovalUpdate, db=Depends(get_db)):
+    c = db.cursor()
+
+    # Check if approval exists
+    c.execute("SELECT * FROM Approval WHERE id = ?", (id,))
+    approval = c.fetchone()
+    if not approval:
+        raise HTTPException(status_code=404, detail="Approval not found")
+
+    # Update RC acknowledgment
+    new_ack = "Accepted" if data.action.lower() == "accept" else "Rejected"
+    c.execute("UPDATE Approval SET rc_ack = ? WHERE id = ?", (new_ack, id))
+
+    # Check if both RC and Parent accepted
+    c.execute("SELECT rc_ack, parent_ack FROM Approval WHERE id = ?", (id,))
+    row = c.fetchone()
+    if row["rc_ack"] == "Accepted" and row["parent_ack"] == "Approved":
+        c.execute("UPDATE Approval SET status = 'Approved' WHERE id = ?", (id,))
+    elif row["rc_ack"] == "Rejected":
+        c.execute("UPDATE Approval SET status = 'Rejected' WHERE id = ?", (id,))
+
+    db.commit()
+    return {"message": f"Gate pass {new_ack.lower()} successfully."}
+
 
 # Example Admin APIs
 @app.post("/admin/trigger_fee_collection")
@@ -141,23 +474,63 @@ def release_room(student_id: int, db=Depends(get_db)):
 
 @app.get("/admin/reports/fee_payment")
 def generate_fee_report(db=Depends(get_db)):
-    c = db.cursor()
-    c.execute("""
-        SELECT s.id, s.username, f.amount, f.status FROM Student s
-        LEFT JOIN Fee f ON s.id = f.student_id
-    """)
-    rows = c.fetchall()
-    return {"fee_report": [dict(r) for r in rows]}
+    try:
+        cursor = db.cursor()
+        cursor.execute("""
+          SELECT 
+    s.id AS student_id,
+    s.username,
+    s.email,
+    s.phone,
+    s.semester,
+    s.Program,
+    f.program AS fee_program,
+    f.sem AS fee_semester,
+    f.fee AS hostel_fee_amount,
+    f.deadline,
+    f.fine,
+    t.amount AS paid_amount,
+    t.status AS transaction_status,
+    t.time AS transaction_time
+FROM Student s
+JOIN StudentTransaction t ON s.id = t.stu_id
+JOIN Hostel_Fee f ON t.Hostel_fee_id = f.id
+WHERE t.status = 'Paid'
+ORDER BY t.time DESC;
+
+        """)
+        result = [dict(row) for row in cursor.fetchall()]
+        print("result",result)
+        return {"paid_fees": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 @app.get("/admin/reports/attendance")
-def generate_attendance_report(db=Depends(get_db)):
-    c = db.cursor()
-    c.execute("""
-        SELECT s.id, s.username, a.attendance, a.date FROM Student s
-        LEFT JOIN Attendance a ON s.id = a.stu_id
-    """)
-    rows = c.fetchall()
-    return {"attendance_report": [dict(r) for r in rows]}
+def get_attendance_report(db=Depends(get_db)):
+    try:
+        cursor = db.cursor()
+        cursor.execute("""
+            SELECT 
+                a.id AS attendance_id,
+                s.username AS student_username,
+                s.email AS student_email,
+                s.phone AS student_phone,
+                s.semester AS semester,
+                r.username AS rc_username,
+                a.attendance AS attendance_status,
+                a.date AS date
+            FROM Attendance a
+            LEFT JOIN Student s ON a.stu_id = s.username
+            LEFT JOIN Rooms ro ON s.room_id = ro.id
+            LEFT JOIN RC r ON ro.rc_id = r.id
+            ORDER BY a.date DESC;
+        """)
+        data = [dict(row) for row in cursor.fetchall()]
+        return {"attendance_report": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Attendance update API for RC
 @app.post("/rc/update_attendance")
@@ -177,28 +550,50 @@ def rc_login(login: RCLogin, db=Depends(get_db)):
     user_data = {
         "id": user["id"],
         "username": user["username"],
-        "name": user.get("name", ""),
+       
         "role": "rc"
     }
     return {"msg": "Login successful", "user": user_data}
 
-# ------------------ STUDENT REGISTRATION ------------------
-@app.post("/student/register")
-def register_student(req: StudentRegister, db=Depends(get_db)):
-    c = db.cursor()
-    print("Reached",req)
-    # Check if username or email already exists
-    c.execute("SELECT * FROM Student WHERE username=? OR email=?", (req.username, req.email))
-    if c.fetchone():
-        raise HTTPException(status_code=400, detail="Username or email already exists")
+# @app.post("/student/register")
+# async def register_student(
+#     username: str = Form(...),
+#     password: str = Form(...),
+#     email: str = Form(...),
+#     phone: str = Form(...),
+#     semester: int = Form(...),
+#     image: UploadFile = Form(...),
+#     db = Depends(get_db),
+# ):
+#     c = db.cursor()
 
-    c.execute("""
-        INSERT INTO Student (username, password, email, phone, semester, room_id)
-        VALUES (?, ?, ?, ?, ?, NULL)
-    """, (req.username, req.password, req.email, req.phone, req.semester))
-    print("student register", c)
-    db.commit()
-    return {"msg": "Student registered successfully"}
+#     c.execute("SELECT * FROM Student WHERE username=? OR email=?", (username, email))
+#     if c.fetchone():
+#         raise HTTPException(status_code=400, detail="Username or email already exists")
+
+#     file_location = os.path.join(UPLOAD_FOLDER, image.filename)
+#     with open(file_location, "wb") as f:
+#         f.write(await image.read())
+
+#     c.execute(
+#         """
+#         INSERT INTO Student (username, password, email, phone, semester, face_path, room_id)
+#         VALUES (?, ?, ?, ?, ?, ?, NULL)
+#         """,
+#         (username, password, email, phone, semester, file_location),
+#     )
+#     db.commit()
+#     db.close()
+
+#     # Run Add_faces.py with full path
+#     try:
+#         subprocess.run(["python", ADD_FACES_PATH, username, file_location], check=True)
+#     except subprocess.CalledProcessError as e:
+#         raise HTTPException(status_code=500, detail=f"Error running Add_faces.py: {e}")
+#     except FileNotFoundError:
+#         raise HTTPException(status_code=500, detail="Add_faces.py not found at specified path")
+
+#     return {"msg": f"Student {username} registered successfully and face data added."}
 
 # ------------------ PARENT REGISTRATION ------------------
 @app.post("/parent/register")
@@ -221,9 +616,160 @@ def register_parent(req: ParentRegister, db=Depends(get_db)):
         VALUES (?, ?, ?, ?)
     """, (req.student_id, req.username, req.phone, req.password))
 
-    
+   
     db.commit()
-    return {"msg": "Parent registered successfully"}
+    id = c.lastrowid
+    return {"msg": "Parent registered successfully","user":req,"id": id}
+
+import sys, os
+
+# Dynamically add Attendance/AutoMark to Python path
+sys.path.append(os.path.join(os.path.dirname(__file__), "Attendance", "AutoMark"))
+
+from Attendance.AutoMark.Add_faces import process_face
+
+
+# @app.post("/student/register")
+# async def register_student(
+#     username: str = Form(...),
+#     password: str = Form(...),
+#     email: str = Form(...),
+#     phone: str = Form(...),
+#     semester: int = Form(...),
+#     program: str = Form(...),
+#     image: UploadFile = File(...),
+#     db = Depends(get_db),
+# ):
+#     c = db.cursor()
+
+#     # check duplicates
+#     c.execute("SELECT * FROM Student WHERE username=? OR email=?", (username, email))
+#     if c.fetchone():
+#         raise HTTPException(status_code=400, detail="Username or email already exists")
+
+#     # save uploaded image file (uploads folder next to main2.py)
+#     BASE_DIR = os.path.dirname(__file__)
+#     UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+#     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+#     # sanitize filename if needed; here we use timestamp + original name
+#     safe_fname = f"{image.filename}"
+#     file_location = os.path.join(UPLOAD_FOLDER, safe_fname)
+
+#     with open(file_location, "wb") as f:
+#         f.write(await image.read())
+#     print(f"[REGISTER] Saved image at {file_location}", flush=True)
+#     # process face using the module we created
+#     try:
+#         num_faces = process_face(file_location, username)
+#         print(f"[REGISTER] {num_faces} face(s) processed successfully.", flush=True)
+#     except Exception as e:
+#         # optional: remove saved file if processing failed
+#         if os.path.exists(file_location):
+#             os.remove(file_location)
+#         raise HTTPException(status_code=400, detail=f"Face processing failed: {str(e)}")
+#     # 3️⃣ Find a room with availability > 0
+#     c.execute("SELECT id, availability FROM Rooms WHERE availability > 0 ORDER BY availability ASC LIMIT 1")
+#     room = c.fetchone()
+
+#     if room:
+#         room_id = room[0]
+#         new_availability = room[1] - 1
+#         c.execute("UPDATE Rooms SET availability = ? WHERE id = ?", (new_availability, room_id))
+#     else:
+#         room_id = 0
+
+#     # 4️⃣ Insert new student
+#     c.execute(
+#         """
+#         INSERT INTO Student (username, password, email, phone, semester, program, face_path, room_id)
+#         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+#         """,
+#         (username, password, email, phone, semester, program, file_location, room_id),
+#     )
+
+#     db.commit()
+#     student_id = c.lastrowid
+#     db.close()
+
+#     return {
+#         "msg": "Student registered successfully",
+#         "assigned_room_id": room_id,
+#         "room_status": "Assigned" if room_id != 0 else "No rooms available",
+#         "id": student_id,
+#     }
+
+    # find an available room, insert student, etc.
+    # ... (your existing DB logic here)
+
+
+
+
+@app.post("/student/register")
+async def register_student(
+    username: str = Form(...),
+    password: str = Form(...),
+    email: str = Form(...),
+    phone: str = Form(...),
+    semester: int = Form(...),
+    program: str = Form(...),
+    image: UploadFile = File(...),
+    db = Depends(get_db),
+):
+    c = db.cursor()
+
+    # 1️⃣ Check for existing username or email
+    c.execute("SELECT * FROM Student WHERE username=? OR email=?", (username, email))
+    if c.fetchone():
+        raise HTTPException(status_code=400, detail="Username or email already exists")
+
+    # 2️⃣ Save uploaded image
+    file_location = os.path.join(UPLOAD_FOLDER, image.filename)
+    with open(file_location, "wb") as f:
+        f.write(await image.read())
+    print(f"[REGISTER] Saved image at {file_location}", flush=True)
+    # process face using the module we created
+    try:
+        num_faces = process_face(file_location, username)
+        print(f"[REGISTER] {num_faces} face(s) processed successfully.", flush=True)
+    except Exception as e:
+        # optional: remove saved file if processing failed
+        if os.path.exists(file_location):
+            os.remove(file_location)
+        raise HTTPException(status_code=400, detail=f"Face processing failed: {str(e)}")
+
+
+    # 3️⃣ Find a room with availability > 0
+    c.execute("SELECT id,rc_id, availability FROM Rooms WHERE availability > 0 ORDER BY availability ASC LIMIT 1")
+    room = c.fetchone()
+
+    if room:
+        room_id = room[0]
+        new_availability = room[1] - 1
+        c.execute("UPDATE Rooms SET availability = ? WHERE id = ?", (new_availability, room_id))
+    else:
+        room_id = 0
+
+    # 4️⃣ Insert new student
+    c.execute(
+        """
+        INSERT INTO Student (username, password, email, phone, semester, program, face_path, room_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (username, password, email, phone, semester, program, file_location, room_id),
+    )
+
+    db.commit()
+    student_id = c.lastrowid
+    db.close()
+
+    return {
+        "msg": "Student registered successfully",
+        "assigned_room_id": room_id,
+        "room_status": "Assigned" if room_id != 0 else "No rooms available",
+        "id": student_id,
+    }
+
 # ------------------ RC REGISTRATION ------------------
 @app.post("/rc/register")
 def register_rc(req: RCRegister, db=Depends(get_db)):
@@ -240,7 +786,8 @@ def register_rc(req: RCRegister, db=Depends(get_db)):
     """, (req.phone, req.username, req.password, req.email))
 
     db.commit()
-    return {"msg": "RC registered successfully"}
+    id = c.lastrowid
+    return {"msg": "RC registered successfully","id":id}
 
 
 
@@ -311,26 +858,6 @@ def rc_view_records(student_id: int, db=Depends(get_db)):
     attendance = [dict(row) for row in c.fetchall()]
     return {"fee_records": fees, "attendance_records": attendance}
 
-# Parent login
-
-# Approve/reject gatepass by parent
-# @app.post("/parent/approve_gatepass")
-# def approve_gatepass(approval: GatepassApproval, db=Depends(get_db)):
-#     status = 'approved' if approval.approved else 'rejected'
-#     c = db.cursor()
-#     c.execute("UPDATE Approval SET status=?, parent_ack=? WHERE id=?", (status, status, approval.approval_id))
-#     db.commit()
-#     return {"msg": f"Gatepass {status}"}
-
-# @app.get("/parent/student_records/{student_id}")
-# def parent_view_student_records(student_id: int, db=Depends(get_db)):
-#     c = db.cursor()
-#     c.execute("SELECT * FROM Fee WHERE student_id=?", (student_id,))
-#     fees = [dict(row) for row in c.fetchall()]
-#     c.execute("SELECT * FROM Attendance WHERE stu_id=?", (student_id,))
-#     attendance = [dict(row) for row in c.fetchall()]
-#     return {"fee_records": fees, "attendance_records": attendance}
-
 # Student login
 @app.post("/student/login")
 def student_login(login: StudentLogin, db=Depends(get_db)):
@@ -362,11 +889,11 @@ def pay_fee(payment: PaymentRequest, db=Depends(get_db)):
 @app.get("/parent/student_records/{student_id}")
 def parent_view_student_records(student_id: int, db=Depends(get_db)):
     c = db.cursor()
-    c.execute("SELECT * FROM Fee WHERE student_id=?", (student_id,))
+    c.execute("SELECT * FROM Fee WHERE student_id=? ORDER BY id DESC", (student_id,))
     fees = [dict(row) for row in c.fetchall()]
-    c.execute("SELECT * FROM Attendance WHERE stu_id=?", (student_id,))
+    c.execute("SELECT * FROM Attendance WHERE stu_id=? ORDER BY id DESC", (student_id,))
     attendance = [dict(row) for row in c.fetchall()]
-    c.execute("SELECT * FROM Approval WHERE stu_id=?", (student_id,))
+    c.execute("SELECT * FROM Approval WHERE stu_id=? ORDER BY id DESC", (student_id,))
     approval = [dict(row) for row in c.fetchall()]
     return {"fee_records": fees, "attendance_records": attendance, "approval":approval}
 
@@ -414,10 +941,10 @@ def get_rooms(db=Depends(get_db)):
     return {"rooms": rooms}
 
 # List all gatepasses
-@app.get("/api/gatepasses")
-def list_gatepasses(db=Depends(get_db)):
+@app.get("/api/gatepasses/{rc_id}")
+def list_gatepasses(rc_id:int,db=Depends(get_db)):
     c = db.cursor()
-    c.execute("SELECT * FROM Approval;")
+    c.execute("SELECT * FROM Approval where rc_id=?",(rc_id,))
     rows = c.fetchall()
     print(rows)
     gatepasses = [dict(row) for row in rows]
@@ -588,6 +1115,39 @@ def gatepass_reject(id: int, db=Depends(get_db)):
     db.commit()
     return {"msg": "Gate pass rejected"}
 
+
+@app.get("/api/gatepasses")
+async def create_gatepass( db=Depends(get_db)):
+    try:
+        c = db.cursor()
+        c.execute("SELECT * FROM Approval")
+        rows = c.fetchall()
+        print(rows)
+        gatepasses = [dict(row) for row in rows]
+        return gatepasses
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not create gate pass: {e}")
+    
+# @app.post("/api/gatepasses")
+# async def create_gatepass(req: GatepassCreateRequest, db=Depends(get_db)):
+#     try:
+#         from_date = datetime.strptime(req.from_date, "%Y-%m-%d")
+#         to_date = datetime.strptime(req.to_date, "%Y-%m-%d")
+#         days = (to_date - from_date).days + 1
+#         c = db.cursor()
+
+#         c.execute(
+#             "INSERT INTO Approval (stu_id, rc_id, status, parent_ack, days, reason, from_date, to_date) "
+#             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+#             (req.student_id, None, "Pending", "Pending", days, req.reason, req.from_date, req.to_date)
+#         )
+#         db.commit()
+#         return {"msg": "Gate pass created"}
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=f"Could not create gate pass: {e}")
+
+
 @app.post("/api/gatepasses")
 async def create_gatepass(req: GatepassCreateRequest, db=Depends(get_db)):
     try:
@@ -595,12 +1155,34 @@ async def create_gatepass(req: GatepassCreateRequest, db=Depends(get_db)):
         to_date = datetime.strptime(req.to_date, "%Y-%m-%d")
         days = (to_date - from_date).days + 1
         c = db.cursor()
+
+        # Step 1: Get the student's room_id
+        c.execute("SELECT room_id FROM Student WHERE id = ?", (req.student_id,))
+        student_room = c.fetchone()
+        if not student_room:
+            raise HTTPException(status_code=404, detail="Student not found")
+        room_id = student_room[0]
+
+        # Step 2: Get rc_id from Rooms table using room_id
+        c.execute("SELECT rc_id FROM Rooms WHERE id = ?", (room_id,))
+        room_data = c.fetchone()
+        if not room_data:
+            raise HTTPException(status_code=404, detail="Room not found")
+        rc_id = room_data[0]
+
+        # Step 3: Insert into Approval table
         c.execute(
-            "INSERT INTO Approval (stu_id, rc_id, status, parent_ack, days, reason, from_date, to_date) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (req.student_id, None, "Pending", "Pending", days, req.reason, req.from_date, req.to_date)
+            """
+            INSERT INTO Approval (stu_id, rc_id, status, parent_ack, days, reason, from_date, to_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (req.student_id, rc_id, "Pending", "Pending", days, req.reason, req.from_date, req.to_date)
         )
         db.commit()
-        return {"msg": "Gate pass created"}
+
+        return {"msg": "Gate pass created successfully"}
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Could not create gate pass: {e}")
