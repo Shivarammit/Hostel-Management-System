@@ -6,6 +6,8 @@ import os,sys
 from datetime import datetime
 from fastapi import FastAPI, Request,UploadFile, Form, Depends, HTTPException, File 
 
+from api import BASE_API, DB_PATH
+
 app = FastAPI()
 import subprocess
 # CORS configuration for React frontend
@@ -15,7 +17,6 @@ origins = [
     "http://hms-frontend-react.s3-website.ap-south-1.amazonaws.com",
     "https://hms-frontend-react.s3-website.ap-south-1.amazonaws.com",
 ]
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -27,9 +28,8 @@ app.add_middleware(
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-
-# DATABASE = os.path.join(os.path.dirname(__file__), "hms.db")
-DATABASE = r"C:\Users\user\OneDrive\Desktop\New folder\Hostel-Management-System\hms.db"
+DATABASE = DB_PATH
+# DATABASE = r"C:\Users\user\OneDrive\Desktop\New folder\Hostel-Management-System\hms.db"
 
 def get_db():
     conn = sqlite3.connect(DATABASE, check_same_thread=False)

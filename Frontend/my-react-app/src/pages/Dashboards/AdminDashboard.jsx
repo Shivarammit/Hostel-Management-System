@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import ProCard from "../../components/ProCard";
+import { BASE_API } from "../../api";
 
 export default function AdminDashboard() {
   const [feeReport, setFeeReport] = useState([]);
@@ -35,9 +36,9 @@ export default function AdminDashboard() {
       setLoading(true);
       try {
         const [fee, attendance, hostelFee] = await Promise.all([
-          fetch("http://localhost:8000/admin/reports/fee_payment").then((res) => res.json()),
-          fetch("http://localhost:8000/admin/reports/attendance").then((res) => res.json()),
-          fetch("http://localhost:8000/admin/reports/hostel_fee").then((res) => res.json()),
+          fetch(`${BASE_API}/admin/reports/fee_payment`).then((res) => res.json()),
+          fetch(`${BASE_API}/admin/reports/attendance`).then((res) => res.json()),
+          fetch(`${BASE_API}/admin/reports/hostel_fee`).then((res) => res.json()),
         ]);
 
         setFeeReport(fee.paid_fees || []);
@@ -45,10 +46,10 @@ export default function AdminDashboard() {
         setHostelFeeData(hostelFee.data || []);
 
         const [studentRes, rcRes, parentRes, adminRes] = await Promise.all([
-          fetch("http://localhost:8000/admin/count/students").then((res) => res.json()),
-          fetch("http://localhost:8000/admin/count/rc").then((res) => res.json()),
-          fetch("http://localhost:8000/admin/count/parents").then((res) => res.json()),
-          fetch("http://localhost:8000/admin/count/admins").then((res) => res.json()),
+          fetch(`${BASE_API}/admin/count/students`).then((res) => res.json()),
+          fetch(`${BASE_API}/admin/count/rc`).then((res) => res.json()),
+          fetch(`${BASE_API}/admin/count/parents`).then((res) => res.json()),
+          fetch(`${BASE_API}/admin/count/admins`).then((res) => res.json()),
         ]);
 
         setUsers({
@@ -83,7 +84,7 @@ export default function AdminDashboard() {
     try {
       const created_time = new Date().toISOString().slice(0, 19).replace("T", " ");
       console.log("created",created_time)
-      const res = await fetch("http://localhost:8000/admin/hostel_fee_details", {
+      const res = await fetch(`${BASE_API}/admin/hostel_fee_details`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -195,7 +196,7 @@ export default function AdminDashboard() {
         className="btn btn-primary"
         onClick={async () => {
           try {
-            const res = await fetch("http://localhost:8000/start-attendance");
+            const res = await fetch(`${BASE_API}/start-attendance`);
             const data = await res.json();
             alert(data.message || data.error);
           } catch (err) {

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 
+import { BASE_API } from "../../api";
 
 // Example Bootstrap-style card wrapper (replace/className as needed)
 function Card({ title, children }) {
@@ -24,7 +25,7 @@ const { student_id } = location.state || {};
 
 
  function approve(id) {
-  fetch("http://localhost:8000/parent/approve_gatepass", {
+  fetch(`${BASE_API}/parent/approve_gatepass`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -47,7 +48,7 @@ const { student_id } = location.state || {};
 }
 
 function reject(id) {
-  fetch("http://localhost:8000/parent/approve_gatepass", {
+  fetch(`${BASE_API}/parent/approve_gatepass`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -80,7 +81,7 @@ function reject(id) {
       setError(null);
       try {
         const [records] = await Promise.all([
-          fetch(`http://localhost:8000/parent/student_records/${student_id}`).then(res => res.json()),
+          fetch(`${BASE_API}/parent/student_records/${student_id}`).then(res => res.json()),
         ]);
         console.log(records);
         setFeeRecords(records.fee_records || []);

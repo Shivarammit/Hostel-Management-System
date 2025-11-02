@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
+import { BASE_API } from "../../api";
 
 export default function ListAttendance() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:8000/admin/reports/attendance")
+    fetch(`${BASE_API}/admin/reports/attendance`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch attendance report");
         return res.json();

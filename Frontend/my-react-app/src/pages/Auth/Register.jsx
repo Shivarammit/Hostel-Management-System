@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { BASE_API } from "../../api";
 
 export default function Register() {
   const [payload, setPayload] = useState({
@@ -22,15 +23,15 @@ export default function Register() {
   const getRegisterUrl = (role) => {
     switch (role.toLowerCase()) {
       case 'student':
-        return 'http://localhost:8000/student/register';
+        return `${BASE_API}/student/register`;
       case 'parent':
-        return 'http://localhost:8000/parent/register';
+        return `${BASE_API}/parent/register`;
       case 'rc':
-        return 'http://localhost:8000/rc/register';
+        return `${BASE_API}/rc/register`;
       case 'admin':
-        return 'http://localhost:8000/admin/register';
+        return `${BASE_API}/admin/register`;
       default:
-        return 'http://localhost:8000/student/register';
+        return `${BASE_API}/student/register`;
     }
   };
 

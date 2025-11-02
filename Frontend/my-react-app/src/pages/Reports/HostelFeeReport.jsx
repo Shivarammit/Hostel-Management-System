@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { BASE_API } from "../../api";
 
 export default function HostelFeeReport() {
   const [hostelFees, setHostelFees] = useState([]);
@@ -8,7 +9,7 @@ export default function HostelFeeReport() {
     async function fetchHostelFee() {
       setLoading(true);
       try {
-        const res = await fetch("http://localhost:8000/admin/reports/hostel_fee");
+        const res = await fetch(`${BASE_API}/admin/reports/hostel_fee`);
         const data = await res.json();
         setHostelFees(data.data || []);
       } catch (err) {

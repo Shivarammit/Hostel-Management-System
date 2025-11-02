@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { BASE_API } from "../../api";
 
 export default function Reports() {
   const [attendance, setAttendance] = useState([]);
@@ -6,13 +7,13 @@ export default function Reports() {
   const [gatepasses, setGatepasses] = useState([]);
 
   useEffect(() => {
-    fetch("http://localhost:8000/admin/reports/attendance")
+    fetch(`${BASE_API}/admin/reports/attendance`)
       .then((res) => res.json())
       .then((data) => setAttendance(data.attendance || []));
-    fetch("http://localhost:8000/admin/reports/feepayment")
+    fetch(`${BASE_API}/admin/reports/feepayment`)
       .then((res) => res.json())
       .then((data) => setFees(data.feereport || []));
-    fetch("http://localhost:8000/api/reports/gatepasses")
+    fetch(`${BASE_API}/api/reports/gatepasses`)
       .then((res) => res.json())
       .then((data) => setGatepasses(data.gatepasses || []));
   }, []);

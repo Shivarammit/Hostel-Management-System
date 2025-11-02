@@ -1,5 +1,6 @@
   import React, { useState, useEffect } from "react";
   import { useAuth } from "../../contexts/AuthContext";
+import { BASE_API } from "../../api";
 
   export default function GatePassStatus() {
     const {user} = useAuth();
@@ -12,7 +13,7 @@
 
 
     const fetchGatePasses = async () => {
-      const res = await fetch("http://localhost:8000/api/gatepasses");
+      const res = await fetch(`${BASE_API}/api/gatepasses`);
       const data = await res.json();
       console.log("pass",data);
       let myPasses;

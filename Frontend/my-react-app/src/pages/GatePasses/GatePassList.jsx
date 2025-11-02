@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
+import { BASE_API } from "../../api";
 
 export default function GatePassList() {
   const user = useAuth();
@@ -8,7 +9,7 @@ export default function GatePassList() {
 
   const fetchData = async () => {
     setLoading(true);
-    const res = await fetch("http://localhost:8000/api/gatepasses");
+    const res = await fetch(`${BASE_API}/api/gatepasses`);
     const data = await res.json();
     let filtered;
     if (user.role === "Parent") {
@@ -29,11 +30,11 @@ export default function GatePassList() {
 
   const handleApprove = async (id) => {
     if (user.role === "Parent") {
-      await fetch(`http://localhost:8000/api/gatepasses/${id}/parent-approve`, {
+      await fetch(`${BASE_API}/api/gatepasses/${id}/parent-approve`, {
         method: "POST",
       });
     } else if (user.role === "RC") {
-      await fetch(`http://localhost:8000/api/gatepasses/${id}/rc-approve`, {
+      await fetch(`${BASE_API}/api/gatepasses/${id}/rc-approve`, {
         method: "POST",
       });
     }
@@ -41,7 +42,7 @@ export default function GatePassList() {
   };
 
   const handleReject = async (id) => {
-    await fetch(`http://localhost:8000/api/gatepasses/${id}/reject`, {
+    await fetch(`${BASE_API}/api/gatepasses/${id}/reject`, {
       method: "POST",
     });
     fetchData();

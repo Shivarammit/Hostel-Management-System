@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { BASE_API } from "../../api";
 
 export default function Fees() {
   const [fees, setFees] = useState([]);
@@ -9,7 +10,7 @@ export default function Fees() {
   useEffect(() => {
     if (!studentId) return;
     setLoading(true);
-    fetch(`http://localhost:8000/rc/view_records/${studentId}`)
+    fetch(`${BASE_API}/rc/view_records/${studentId}`)
       .then((res) => res.json())
       .then((data) => {
         setFees(data.fee_records || []);
@@ -19,7 +20,7 @@ export default function Fees() {
 
   const handlePay = async (feeId) => {
     setPaymentStatus("Processing...");
-    const res = await fetch("http://localhost:8000/student/pay_fee", {
+    const res = await fetch(`${BASE_API}/student/pay_fee`, {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({

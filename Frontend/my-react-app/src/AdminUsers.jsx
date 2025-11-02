@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import ProCard from "./components/ProCard";
+import {BASE_API} from "./api";
 
 export default function AdminUsers() {
   const [students, setStudents] = useState([]);
@@ -26,10 +27,10 @@ export default function AdminUsers() {
     async function fetchUsers() {
       try {
         const [studentRes, parentRes, rcRes, adminRes] = await Promise.all([
-          fetch("http://localhost:8000/admin/users/students").then((res) => res.json()),
-          fetch("http://localhost:8000/admin/users/parents").then((res) => res.json()),
-          fetch("http://localhost:8000/admin/users/rc").then((res) => res.json()),
-          fetch("http://localhost:8000/admin/users/admins").then((res) => res.json()),
+          fetch(`${BASE_API}/admin/users/students`).then((res) => res.json()),
+          fetch(`${BASE_API}/admin/users/parents`).then((res) => res.json()),
+          fetch(`${BASE_API}/admin/users/rc`).then((res) => res.json()),
+          fetch(`${BASE_API}/admin/users/admins`).then((res) => res.json()),
         ]);
 
         setStudents(studentRes.students || []);

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { BASE_API } from "../../api";
 
 export default function RCAttendance() {
   const [students, setStudents] = useState([]);
@@ -9,12 +10,12 @@ export default function RCAttendance() {
   useEffect(() => {
     async function load() {
       // Fetch student list
-      const studentsRes = await fetch('http://localhost:8000/api/students');
+      const studentsRes = await fetch(`${BASE_API}/api/students`);
       const studentsData = await studentsRes.json();
       setStudents(studentsData.students || []);
 
       // Fetch attendance for selected date
-      const attendanceRes = await fetch(`http://localhost:8000/rc/view_records/${date}`);
+      const attendanceRes = await fetch(`${BASE_API}/rc/view_records/${date}`);
       const attendanceData = await attendanceRes.json();
       // Convert attendance array to record map { stu_id: true/false }
       const recordMap = {};
@@ -32,7 +33,7 @@ export default function RCAttendance() {
   const save = async () => {
     await Promise.all(
       students.map((student) =>
-        fetch('http://localhost:8000/rc/update_attendance', {
+        fetch(`${BASE_API}/rc/update_attendance`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

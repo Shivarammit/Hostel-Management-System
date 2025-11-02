@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
+import { BASE_API } from "../../api";
 
 export default function FeePaidList() {
   const [paidFees, setPaidFees] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:8000/admin/reports/fee_payment")
+    fetch(`${BASE_API}/admin/reports/fee_payment`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch data");
         return res.json();

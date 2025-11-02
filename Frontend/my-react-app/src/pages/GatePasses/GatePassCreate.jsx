@@ -1,5 +1,6 @@
   import React, { useState, useEffect } from "react";
   import { useAuth } from "../../contexts/AuthContext";
+import { BASE_API } from "../../api";
 
   export default function GatePassCreate() {
     const {user} = useAuth();
@@ -12,7 +13,7 @@
 
 
     const fetchGatePasses = async () => {
-      const res = await fetch("http://localhost:8000/api/gatepasses");
+      const res = await fetch(`${BASE_API}/api/gatepasses`);
       const data = await res.json();
       console.log("pass",data);
       let myPasses;
@@ -33,7 +34,7 @@
       setSubmitting(true);
       try {
         console.log("req",user.id,reason,fromDate,toDate);
-        await fetch("http://localhost:8000/api/gatepasses", {
+        await fetch(`${BASE_API}/api/gatepasses`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

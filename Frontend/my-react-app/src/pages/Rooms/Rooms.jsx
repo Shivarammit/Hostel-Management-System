@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { BASE_API } from "../../api";
 
 export default function Rooms() {
   const [search, setSearch] = useState("");
@@ -9,7 +10,7 @@ export default function Rooms() {
 
   // Fetch rooms
   useEffect(() => {
-    fetch("http://localhost:8000/api/rooms")
+    fetch(`${BASE_API}/api/rooms`)
       .then((res) => res.json())
       .then((data) => setRooms(data.rooms || []))
       .catch((err) => console.error("Error fetching rooms:", err));
@@ -17,7 +18,7 @@ export default function Rooms() {
 console.log(rooms);
   // Fetch RC list
   useEffect(() => {
-    fetch("http://localhost:8000/admin/users/rc")
+    fetch(`${BASE_API}/admin/users/rc`)
       .then((res) => res.json())
       .then((data) => setRcList(data.rcs || []))
       .catch((err) => console.error("Error fetching RCs:", err));
@@ -36,7 +37,7 @@ console.log(rooms);
     }
 
     try {
-      const res = await fetch(`http://localhost:8000/api/rooms/${selectedRoom.id}/assign_rc/${selectedRcId}`, {
+      const res = await fetch(`${BASE_API}/api/rooms/${selectedRoom.id}/assign_rc/${selectedRcId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" }
       });

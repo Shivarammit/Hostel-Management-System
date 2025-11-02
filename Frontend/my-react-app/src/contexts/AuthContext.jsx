@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import {BASE_API} from "../api";
 
 const AuthContext = createContext(null);
 
@@ -29,7 +30,7 @@ export const AuthProvider = ({ children }) => {
   try {
     const endpoint = getEndpointForRole(role);
     console.log("end",endpoint);
-    const res = await fetch(`http://localhost:8000/${endpoint}`, {
+    const res = await fetch(`${BASE_API}/${endpoint}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),

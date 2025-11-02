@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import ProCard from "../../components/ProCard";
 import { useAuth } from "../../contexts/AuthContext";
 import { jsPDF } from "jspdf";
+import { BASE_API } from "../../api";
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -12,7 +13,7 @@ export default function StudentDashboard() {
     if (!user || !user.id) return alert("User ID missing");
 
     try {
-      const res = await fetch(`http://localhost:8000/student/fee_receipt/${user.id}`);
+      const res = await fetch(`${BASE_API}/student/fee_receipt/${user.id}`);
       const data = await res.json();
 
       if (!res.ok) {
@@ -60,12 +61,12 @@ export default function StudentDashboard() {
   useEffect(() => {
     if (!user || !user.id) return;
 
-    fetch(`http://localhost:8000/api/hostel_fee/${user.id}`)
+    fetch(`${BASE_API}/api/hostel_fee/${user.id}`)
       .then((res) => res.json())
       .then((data) => setFeeDetails(data))
       .catch((err) => console.error("Error fetching fee details:", err));
     
-    fetch(`http://localhost:8000/api/rooms`)
+    fetch(`${BASE_API}/api/rooms`)
       .then((res) => res.json())
       .then((data) => {
         const rooms = data.rooms || [];
@@ -83,14 +84,14 @@ export default function StudentDashboard() {
 
   const handlePayment = async () => {
     try {
-      const res = await fetch(`http://localhost:8000/api/pay_hostel_fee/${user.id}`, {
+      const res = await fetch(`${BASE_API}/api/pay_hostel_fee/${user.id}`, {
         method: "POST",
       });
       const data = await res.json();
 
       if (res.ok) {
         alert(data.message || "Payment successful!");
-        const updated = await fetch(`http://localhost:8000/api/hostel_fee/${user.id}`);
+        const updated = await fetch(`${BASE_API}/api/hostel_fee/${user.id}`);
         const newData = await updated.json();
         setFeeDetails(newData);
       } else {
