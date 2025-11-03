@@ -27,7 +27,7 @@ app.add_middleware(
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
+print(DB_PATH)
 DATABASE = DB_PATH
 # DATABASE = r"C:\Users\user\OneDrive\Desktop\New folder\Hostel-Management-System\hms.db"
 
@@ -140,6 +140,7 @@ class HostelFee(BaseModel):
     amount: float         # Hostel fee amount
     deadline: str      # e.g., "2025-12-31"
     fine: float | None = None  # Optional fine amount
+    created: datetime | None = None
 
 @app.get("/start-attendance")
 def start_attendance(request: Request):
@@ -159,8 +160,7 @@ def start_attendance(request: Request):
 
     except Exception as e:
         return ({"message": f"❌ Error: {str(e)}"})
-    
-@app.get('/api/hostel_fee/{id}')
+@app.get("/api/hostel_fee/{id}")
 def get_hostel_fee(id: int, db=Depends(get_db)):
     c = db.cursor()
     print(f"\n🟩 START: Fetching hostel fee details for Student ID = {id}")
@@ -177,8 +177,13 @@ def get_hostel_fee(id: int, db=Depends(get_db)):
     print(f"   └─ Program: {program}, Semester: {sem}")
 
     # Step 2: Find matching hostel fee record
-    c.execute("SELECT * FROM Hostel_Fee WHERE program = ? AND sem = ?", (program, sem))
+    c.execute("""
+    SELECT * FROM Hostel_Fee 
+    WHERE program = ? AND sem = ? 
+    ORDER BY created DESC
+    LIMIT 1""", (program, sem))
     hostel_fee = c.fetchone()
+
     print("➡️ Step 2: Hostel fee record:", dict(hostel_fee) if hostel_fee else None)
     if not hostel_fee:
         raise HTTPException(status_code=404, detail="No hostel fee record found for this student")
@@ -198,7 +203,7 @@ def get_hostel_fee(id: int, db=Depends(get_db)):
     transaction = c.fetchone()
     print("➡️ Step 3: Transaction fetched:", dict(transaction) if transaction else None)
 
-    # Step 4: Handle already paid case
+    # Step 4: If already paid, return payment details
     if transaction:
         total_payable = transaction["amount"]
         fine_amount = total_payable - fee_amount if total_payable > fee_amount else 0
@@ -210,33 +215,34 @@ def get_hostel_fee(id: int, db=Depends(get_db)):
             "program": program,
             "semester": sem,
             "fee_amount": fee_amount,
-            "fine": fine_amount,
+            "fine": fine,
             "deadline": deadline,
             "status": "Paid",
+            "fine_applied": fine_amount,
             "total_payable": total_payable,
             "paid_on": transaction["time"]
         }
 
-    # Step 5: Fine calculation (only if not paid)
+    # Step 5: If not paid, calculate fine if overdue
     current_date = datetime.now().date()
     deadline_date = datetime.strptime(deadline, "%Y-%m-%d").date()
     fine_amount = 0
     total_amount = fee_amount
 
-    print(f"➡️ Step 5: Fine calculation")
+    print("➡️ Step 5: Fine calculation")
     print(f"   └─ Current Date: {current_date}, Deadline: {deadline_date}")
 
     if current_date > deadline_date:
-        days_late = (current_date - deadline_date).days  # Number of days late
-        fine_amount = fine * days_late                   # Fine increases per day
-        total_amount += fine_amount   
-        print(f"   └─ Fine applied: {fine_amount}")
+        days_late = (current_date - deadline_date).days
+        fine_amount = fine * days_late
+        total_amount += fine_amount
+        print(f"   └─ Fine applied: ₹{fine_amount} ({days_late} days late)")
     else:
         print("   └─ No fine applied (before deadline)")
 
     # Step 6: Return pending payment details
     print("✅ Step 6: Returning pending payment details")
-    print(f"   └─ Total Payable: {total_amount}, Status: Pending, fine(per day):{fine}\n")
+    print(f"   └─ Total Payable: {total_amount}, Status: Pending\n")
 
     return {
         "student_id": id,
@@ -246,8 +252,10 @@ def get_hostel_fee(id: int, db=Depends(get_db)):
         "fine": fine,
         "deadline": deadline,
         "status": "Pending",
+        "fine_applied": fine_amount,
         "total_payable": total_amount
     }
+
 
 # ✅ Pay Hostel Fee
 @app.post("/api/pay_hostel_fee/{student_id}")
@@ -338,10 +346,10 @@ def add_hostel_fee(fee_data: HostelFee, db=Depends(get_db)):
     try:
         c.execute(
             """
-            INSERT INTO Hostel_Fee (program, sem, fee, deadline, fine)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO Hostel_Fee (program, sem, fee, deadline, fine,created)
+            VALUES (?, ?, ?, ?, ?,?)
             """,
-            (fee_data.program, fee_data.semester, fee_data.amount, fee_data.deadline, fee_data.fine),
+            (fee_data.program, fee_data.semester, fee_data.amount, fee_data.deadline, fee_data.fine, fee_data.created),
         )
         db.commit()
         return {"msg": "✅ Hostel fee details added successfully!"}

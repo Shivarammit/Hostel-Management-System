@@ -26,6 +26,7 @@ export default function AdminDashboard() {
    const takeattendanceRef = useRef(null);
   const hostelRef = useRef(null);
   const triggerRef = useRef(null);
+  const roomRef=useRef(null);
 
   const scrollToSection = (ref) => {
     ref.current.scrollIntoView({ behavior: "smooth" });
@@ -92,7 +93,8 @@ export default function AdminDashboard() {
           semester: parseInt(formData.semester),
           amount: parseFloat(formData.amount),
           deadline: formData.deadline,
-          fine: parseFloat(formData.fine || 0)
+          fine: parseFloat(formData.fine || 0),
+          created:created_time
         }),
       });
 
@@ -136,6 +138,7 @@ export default function AdminDashboard() {
         <strong>Quick Navigation: </strong>
         <button onClick={() => scrollToSection(usersRef)} style={styles.navBtn}>Users</button>
         <button onClick={() => scrollToSection(feeRef)} style={styles.navBtn}>Fee Report</button>
+        <button onClick={() => scrollToSection(roomRef)} style={styles.navBtn}>Manage Rooms</button>
         <button onClick={() => scrollToSection(attendanceRef)} style={styles.navBtn}>Attendance</button>
         <button onClick={() => scrollToSection(takeattendanceRef)} style={styles.navBtn}>Record Attendance</button>
         <button onClick={() => scrollToSection(hostelRef)} style={styles.navBtn}>Hostel Fee Report</button>
@@ -188,9 +191,20 @@ export default function AdminDashboard() {
           </div>
         </ProCard>
       </section>
+
+
+       <section ref={roomRef} style={styles.section}>
+          <ProCard title="Rooms">
+            Create, edit rooms and allocate beds.
+            <a href="/admin/rooms" style={styles.link} className="d-block mt-2">Open Rooms</a>
+          </ProCard>
+        </section>
+
+
+
         {/* ATTENDANCE REPORT */}
       <section ref={takeattendanceRef} style={styles.section}>
-  <ProCard title="Take Attendance">
+  <ProCard title="Record Attendance">
     <div className="text-center my-3">
       <button
         className="btn btn-primary"
