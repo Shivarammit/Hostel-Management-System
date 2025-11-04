@@ -9,7 +9,7 @@ from datetime import datetime
 
 
 from win32com.client import Dispatch
-
+address ="Attendance/Attendance_"
 def speak(str1):
     speak=Dispatch(("SAPI.SpVoice"))
     speak.Speak(str1)
@@ -42,7 +42,7 @@ while True:
         ts=time.time()
         date=datetime.fromtimestamp(ts).strftime("%d-%m-%Y")
         timestamp=datetime.fromtimestamp(ts).strftime("%H:%M-%S")
-        exist=os.path.isfile("Attendance/Attendance_" + date + ".csv")
+        exist=os.path.isfile(address + date + ".csv")
         cv2.rectangle(frame, (x,y), (x+w, y+h), (0,0,255), 1)
         cv2.rectangle(frame,(x,y),(x+w,y+h),(50,50,255),2)
         cv2.rectangle(frame,(x,y-40),(x+w,y),(50,50,255),-1)
@@ -56,12 +56,12 @@ while True:
         speak("Attendance Taken..")
         time.sleep(5)
         if exist:
-            with open("Attendance/Attendance_" + date + ".csv", "+a") as csvfile:
+            with open(address + date + ".csv", "+a") as csvfile:
                 writer=csv.writer(csvfile)
                 writer.writerow(attendance)
             csvfile.close()
         else:
-            with open("Attendance/Attendance_" + date + ".csv", "+a") as csvfile:
+            with open(address + date + ".csv", "+a") as csvfile:
                 writer=csv.writer(csvfile)
                 writer.writerow(COL_NAMES)
                 writer.writerow(attendance)

@@ -12,3 +12,9 @@ return (
 </div>
 );
 }
+// ✅ Add prop types validation
+ProCard.propTypes = {
+  title: PropTypes.string,
+  children: PropTypes.node,
+  footer: PropTypes.node
+};

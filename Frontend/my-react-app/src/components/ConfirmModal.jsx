@@ -20,3 +20,9 @@ return (
 </div>
 );
 }
+ConfirmModal.propTypes = {
+  id: PropTypes.string,
+  title: PropTypes.string,
+  body: PropTypes.string,
+  onConfirm: PropTypes.func.isRequired
+};

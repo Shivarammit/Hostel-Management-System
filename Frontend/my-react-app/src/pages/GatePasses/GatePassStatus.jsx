@@ -4,10 +4,6 @@ import { BASE_API } from "../../api";
 
   export default function GatePassStatus() {
     const {user} = useAuth();
-    const [reason, setReason] = useState("");
-    const [fromDate, setFromDate] = useState("");
-    const [toDate, setToDate] = useState("");
-    const [submitting, setSubmitting] = useState(false);
     const [gatePasses, setGatePasses] = useState([]);
 
 

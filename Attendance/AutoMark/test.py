@@ -44,8 +44,6 @@ print("[INFO] KNN trained with 1 neighbor and loaded face data.\n")
 
 print("Press 'Enter' to take attendance, and 'Shift' or 'Ctrl' to stop.\n")
 
-
-# DB_PATH = r"C:\Users\user\OneDrive\Desktop\New folder\Hostel-Management-System\hms.db"
 conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 cursor = conn.cursor()
 
